@@ -1,0 +1,6 @@
+{
+  "status": "error",
+  "message": "无法获取 A 股股票清单。Traceback (most recent call last):   File \"/opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/site-packages/urllib3/connectionpool.py\", line 793, in urlopen     response = self._make_request(                ^^^^^^^^^^^^^^^^^^^   File \"/opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/site-packages/urllib3/connectionpool.py\", line 494, in _make_request     raise new_e   File \"/opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/site-packages/urllib3/connectionpool.py\", line 470, in _ma",
+  "completed_at": "2026-09-20T08:45:17.346772+00:00",
+  "matches": []
+}
