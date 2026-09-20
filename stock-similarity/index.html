@@ -6,66 +6,56 @@
   <meta name="description" content="基于 GitHub Actions 的股票历史相似走势搜索器">
   <title>Historical Pattern Finder</title>
   <style>
-    :root {
-      --ink: #18201c;
-      --muted: #6b746d;
-      --paper: #f2f0e9;
-      --panel: #fffef9;
-      --line: #d6d4ca;
-      --signal: #e66335;
-      --signal-dark: #b84320;
-      --green: #1c7059;
-      --shadow: 0 18px 48px rgba(27, 37, 31, .10);
-    }
+    :root { --ink: #202747; --muted: #717995; --paper: #f6f8ff; --panel: #fff; --line: #e2e6f3; --signal: #6558ef; --signal-dark: #4f43cf; --green: #16856b; --shadow: 0 18px 44px rgba(55, 66, 126, .10); }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       color: var(--ink);
-      background: radial-gradient(circle at 100% 0, #dcebdd 0, transparent 28rem), var(--paper);
-      font: 16px/1.55 Georgia, "Noto Serif SC", serif;
+      background: radial-gradient(circle at 8% 6%, #e7e3ff 0, transparent 25rem), radial-gradient(circle at 95% 0, #dff4ff 0, transparent 28rem), var(--paper);
+      font: 16px/1.55 "Nunito Sans", "Arial Rounded MT Bold", "PingFang SC", "Microsoft YaHei", sans-serif;
     }
     main { max-width: 1120px; margin: 0 auto; padding: 40px 22px 72px; }
     .masthead { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; margin-bottom: 34px; }
-    .eyebrow { margin: 0 0 8px; color: var(--signal-dark); font: 700 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; }
-    h1 { margin: 0; max-width: 760px; font-size: clamp(2.25rem, 5vw, 4.8rem); line-height: .98; letter-spacing: -.055em; }
-    .subhead { max-width: 720px; margin: 16px 0 0; color: var(--muted); font-size: 1.05rem; }
-    .back { color: var(--ink); font: 700 14px ui-monospace, SFMono-Regular, Menlo, monospace; text-decoration: none; }
+    .eyebrow { margin: 0 0 9px; color: var(--signal); font-size: .76rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 0; max-width: 760px; font-size: clamp(2.35rem, 5vw, 4.6rem); font-weight: 900; line-height: .98; letter-spacing: -.065em; }
+    .subhead { max-width: 650px; margin: 17px 0 0; color: var(--muted); font-size: 1.04rem; }
+    .back { padding: 10px 15px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: #ffffffa8; font-size: .84rem; font-weight: 800; text-decoration: none; transition: background .2s ease, color .2s ease; }
     .back:hover { color: var(--signal-dark); }
     .layout { display: grid; grid-template-columns: minmax(0, 410px) minmax(0, 1fr); gap: 24px; align-items: start; }
-    .panel { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+    .panel { background: #ffffffdc; border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); backdrop-filter: blur(12px); }
     .form-panel { padding: 25px; position: sticky; top: 20px; }
-    h2 { margin: 0 0 20px; font-size: 1.25rem; letter-spacing: -.02em; }
-    label { display: block; margin: 16px 0 6px; font: 700 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; text-transform: uppercase; }
-    input, select, button { width: 100%; border-radius: 0; font: inherit; }
-    input, select { padding: 10px 11px; border: 1px solid #aeb4aa; background: #fff; color: var(--ink); }
-    input:focus, select:focus { outline: 3px solid #ffc6ae; border-color: var(--signal); }
+    h2 { margin: 0 0 20px; font-size: 1.3rem; letter-spacing: -.04em; }
+    label { display: block; margin: 16px 0 7px; color: #48506c; font-size: .75rem; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+    input, select, button { width: 100%; border-radius: 13px; font: inherit; }
+    input, select { padding: 11px 12px; border: 1px solid #d7dceb; background: #fafbff; color: var(--ink); }
+    input:focus, select:focus { outline: 3px solid #d9d5ff; border-color: var(--signal); background: #fff; }
     .help { margin: 7px 0 0; color: var(--muted); font-size: .82rem; }
     .grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .scope-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .scope-options label { margin: 0; padding: 10px; border: 1px solid #aeb4aa; background: #fff; cursor: pointer; font: 700 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; text-align: center; text-transform: none; }
+    .scope-options label { margin: 0; padding: 11px 8px; border: 1px solid #d7dceb; border-radius: 13px; background: #fafbff; cursor: pointer; font-size: .78rem; font-weight: 800; text-align: center; text-transform: none; }
     .scope-options input { width: auto; margin-right: 5px; accent-color: var(--signal); }
-    button { margin-top: 22px; padding: 13px 18px; border: 0; background: var(--signal); color: #fffdf8; cursor: pointer; font: 700 14px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
+    button { margin-top: 22px; padding: 14px 18px; border: 0; border-radius: 15px; background: linear-gradient(135deg, #7769ff, #5562e9); box-shadow: 0 10px 20px #6258db42; color: #fff; cursor: pointer; font-size: .9rem; font-weight: 900; letter-spacing: .02em; }
     button:hover { background: var(--signal-dark); }
     button:disabled { background: #9b9f98; cursor: wait; }
     details { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
-    summary { cursor: pointer; font: 700 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    summary { cursor: pointer; color: #4b5371; font-size: .8rem; font-weight: 800; }
     .results-panel { min-height: 500px; padding: 28px; overflow: hidden; }
     .empty { display: grid; min-height: 420px; place-content: center; text-align: center; color: var(--muted); }
     .empty strong { color: var(--ink); font-size: 1.35rem; }
-    .status { display: none; margin-bottom: 22px; padding: 13px 15px; background: #f2efe6; border-left: 4px solid var(--signal); }
+    .status { display: none; margin-bottom: 22px; padding: 13px 15px; border: 1px solid #ddd9ff; border-radius: 14px; background: #f4f2ff; color: #4f43cf; }
     .status.show { display: block; }
     .status.error { border-color: #aa3030; background: #f8e9e7; }
     .status.success { border-color: var(--green); background: #e6f0e9; }
-    .query { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 0 0 23px; background: var(--line); border: 1px solid var(--line); }
-    .query div { padding: 11px 12px; background: var(--panel); }
-    .query span { display: block; color: var(--muted); font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
+    .query { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 0 23px; }
+    .query div { padding: 13px; border: 1px solid var(--line); border-radius: 14px; background: #fafbff; }
+    .query span { display: block; color: var(--muted); font-size: .68rem; font-weight: 800; text-transform: uppercase; }
     .query b { font-size: .94rem; }
     .table-wrap { overflow-x: auto; margin: 0 -28px; padding: 0 28px 5px; }
     table { width: 100%; min-width: 780px; border-collapse: collapse; font-size: .87rem; }
-    th { color: var(--muted); font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; }
+    th { color: var(--muted); font-size: .68rem; font-weight: 900; text-align: right; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; }
     th:first-child, td:first-child, td:nth-child(2) { text-align: left; }
     td, th { padding: 10px 8px; border-bottom: 1px solid var(--line); text-align: right; }
-    td:first-child { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; }
+    td:first-child { font-weight: 900; }
     .positive { color: var(--green); font-weight: 700; }
     .negative { color: #b4342d; font-weight: 700; }
     .notice { margin-top: 21px; color: var(--muted); font-size: .82rem; }
