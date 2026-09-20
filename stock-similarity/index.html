@@ -41,6 +41,9 @@
     input:focus, select:focus { outline: 3px solid #ffc6ae; border-color: var(--signal); }
     .help { margin: 7px 0 0; color: var(--muted); font-size: .82rem; }
     .grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .scope-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .scope-options label { margin: 0; padding: 10px; border: 1px solid #aeb4aa; background: #fff; cursor: pointer; font: 700 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; text-align: center; text-transform: none; }
+    .scope-options input { width: auto; margin-right: 5px; accent-color: var(--signal); }
     button { margin-top: 22px; padding: 13px 18px; border: 0; background: var(--signal); color: #fffdf8; cursor: pointer; font: 700 14px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
     button:hover { background: var(--signal-dark); }
     button:disabled { background: #9b9f98; cursor: wait; }
@@ -114,9 +117,16 @@
           </div>
         </div>
 
+        <label>候选范围</label>
+        <div class="scope-options" role="radiogroup" aria-label="候选范围">
+          <label><input type="radio" name="scope" value="custom" checked>自定义股票池</label>
+          <label><input type="radio" name="scope" value="a-share">沪深京 A 股全市场</label>
+        </div>
+        <p id="scope-help" class="help">自定义池可查询近期或历史数据。全市场仅支持近期模式，系统分批扫描并合并 Top 20。</p>
+
         <label for="universe">股票池</label>
         <input id="universe" required value="600519.SS,000001.SZ,601318.SS,300750.SZ,AAPL,MSFT" placeholder="600519.SS,000001.SZ,AAPL">
-        <p class="help">逗号分隔，最多 50 支。历史模式会扫描每支股票近 8 年的滑动窗口，运行时间较长。</p>
+        <p id="universe-help" class="help">逗号分隔，最多 50 支。历史模式会扫描每支股票近 8 年的滑动窗口，运行时间较长。</p>
 
         <button id="submit" type="submit">开始匹配 · Top 20</button>
         <details>
@@ -203,7 +213,7 @@
       result.innerHTML = `
         <div class="query">
           <div><span>目标窗口</span><b>${escapeHtml(query.ticker)} · ${escapeHtml(query.start)} 至 ${escapeHtml(query.end)}</b></div>
-          <div><span>模式 / 阈值</span><b>${query.mode === "recent" ? "近期" : "历史"} / ${query.threshold}%</b></div>
+          <div><span>范围 / 阈值</span><b>${query.scope === "a-share" ? "A 股全市场" : query.mode === "recent" ? "自定义池 · 近期" : "自定义池 · 历史"} / ${query.threshold}%</b></div>
           <div><span>命中</span><b>${payload.total_matches} 个，展示 ${payload.matches.length} 个</b></div>
         </div>
         <div class="table-wrap"><table><thead><tr>
@@ -229,7 +239,7 @@
 
     async function waitForResult(token, requestId, startedAt) {
       let runUrl = "";
-      for (let attempt = 0; attempt < 90; attempt += 1) {
+      for (let attempt = 0; attempt < 180; attempt += 1) {
         const run = await findRun(token, startedAt);
         if (run) {
           runUrl = run.html_url;
@@ -247,7 +257,7 @@
           if (run && run.status === "completed" && run.conclusion !== "success") {
             throw new Error(`工作流执行失败。请查看日志：${runUrl}`);
           }
-          if (attempt === 89) throw new Error("等待结果超时，请稍后用新的请求再次尝试。");
+          if (attempt === 179) throw new Error("等待结果超时，请稍后用新的请求再次尝试。");
           await new Promise((resolve) => setTimeout(resolve, 4000));
         }
       }
@@ -261,19 +271,24 @@
       const end = document.querySelector("#end").value;
       const threshold = document.querySelector("#threshold").value;
       const mode = document.querySelector("#mode").value;
+      const scope = document.querySelector('input[name="scope"]:checked').value;
       const universe = document.querySelector("#universe").value.split(",").map((item) => item.trim().toUpperCase()).filter(Boolean);
       const tickerPattern = /^[A-Z0-9.^=-]{1,24}$/;
-      if (!token || !ticker || !start || !end || universe.length === 0) return;
-      if (!tickerPattern.test(ticker) || universe.some((item) => !tickerPattern.test(item))) {
+      if (!token || !ticker || !start || !end || (scope === "custom" && universe.length === 0)) return;
+      if (!tickerPattern.test(ticker) || (scope === "custom" && universe.some((item) => !tickerPattern.test(item)))) {
         setStatus("股票代码只支持字母、数字及 . ^ = - 字符。", "error");
         return;
       }
-      if (universe.length > 50) {
+      if (scope === "custom" && universe.length > 50) {
         setStatus("股票池最多支持 50 支股票。", "error");
         return;
       }
       if (start > end) {
         setStatus("起始日不能晚于结束日。", "error");
+        return;
+      }
+      if (scope === "a-share" && mode !== "recent") {
+        setStatus("A 股全市场暂仅支持近期模式；历史模式请使用自定义股票池。", "error");
         return;
       }
 
@@ -287,7 +302,7 @@
         await api(`https://api.github.com/repos/${OWNER}/${REPO}/actions/workflows/${WORKFLOW}/dispatches`, token, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ref: "master", inputs: { request_id: requestId, ticker, start, end, threshold, mode, top: "20", universe: universe.join(",") } })
+          body: JSON.stringify({ ref: "master", inputs: { request_id: requestId, ticker, start, end, threshold, mode, scope, top: "20", universe: scope === "custom" ? universe.join(",") : "" } })
         });
         await waitForResult(token, requestId, startedAt);
       } catch (error) {
@@ -296,6 +311,20 @@
         submit.disabled = false;
       }
     });
+
+    document.querySelectorAll('input[name="scope"]').forEach((input) => input.addEventListener("change", () => {
+      const isAShare = document.querySelector('input[name="scope"]:checked').value === "a-share";
+      const mode = document.querySelector("#mode");
+      document.querySelector("#universe").disabled = isAShare;
+      mode.disabled = isAShare;
+      if (isAShare) mode.value = "recent";
+      document.querySelector("#universe-help").textContent = isAShare
+        ? "A 股全市场由 Action 自动获取沪深京股票清单，并分批扫描。"
+        : "逗号分隔，最多 50 支。历史模式会扫描每支股票近 8 年的滑动窗口，运行时间较长。";
+      document.querySelector("#scope-help").textContent = isAShare
+        ? "全市场仅支持近期模式，以控制无服务器运行时长。"
+        : "自定义池可查询近期或历史数据。";
+    }));
   </script>
 </body>
 </html>

@@ -11,3 +11,8 @@ This directory contains the GitHub Pages client and GitHub Actions worker for st
 The form dispatches `.github/workflows/stock-similarity.yml`. The workflow downloads Yahoo Finance daily adjusted OHLCV data, calculates the composite score, and commits a per-request JSON result to `stock-similarity/results/`. The page polls that result and renders the table.
 
 `recent` mode compares the latest available N-day window of each ticker. `historical` mode slides an N-trading-day window through up to eight years of history and includes forward 5/20 trading-day return validation.
+
+The page supports two candidate scopes:
+
+- **Custom universe**: accepts up to 50 comma-separated Yahoo Finance tickers and supports both modes.
+- **沪深京 A 股全市场**: retrieves the current A-share code list through AkShare, divides it into batches of 200 symbols, and scans up to five batches in parallel. This scope supports `recent` mode only. The workflow maps codes to Yahoo Finance `.SS`, `.SZ`, or `.BJ` symbols, uses adjusted daily OHLCV data, then merges global Top 20 results.

@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       ticker:
-        description: Target Yahoo Finance ticker
+        description: Target ticker. A-share mode accepts a six-digit code or .SS/.SZ suffix.
         required: true
         type: string
       start:
@@ -29,16 +29,20 @@ on:
         required: true
         default: recent
         type: choice
-        options:
-          - recent
-          - historical
+        options: [recent, historical]
+      scope:
+        description: Candidate universe
+        required: true
+        default: custom
+        type: choice
+        options: [custom, a-share]
       top:
         description: Maximum number of returned matches
         required: true
         default: "20"
         type: string
       universe:
-        description: Comma-separated Yahoo Finance ticker universe
+        description: Comma-separated Yahoo Finance ticker universe for custom mode
         required: true
         type: string
 
@@ -46,29 +50,43 @@ permissions:
   contents: write
 
 concurrency:
-  group: stock-similarity-results
+  group: stock-similarity-${{ inputs.request_id }}
   cancel-in-progress: false
 
 jobs:
-  search:
+  prepare-a-share:
+    if: inputs.scope == 'a-share' && inputs.mode == 'recent'
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.batches.outputs.matrix }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: master
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: stock-similarity/requirements.txt
+      - run: python -m pip install -r stock-similarity/requirements.txt
+      - id: batches
+        name: Fetch A-share universe and build batches
+        run: echo "matrix=$(python stock-similarity/a_share_batches.py)" >> "$GITHUB_OUTPUT"
 
-      - name: Install dependencies
-        run: python -m pip install -r stock-similarity/requirements.txt
-
+  custom-search:
+    if: inputs.scope == 'custom'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: master
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: stock-similarity/requirements.txt
+      - run: python -m pip install -r stock-similarity/requirements.txt
       - name: Run similarity search
-        id: search
-        continue-on-error: true
         env:
           REQUEST_ID: ${{ inputs.request_id }}
           TICKER: ${{ inputs.ticker }}
@@ -80,18 +98,125 @@ jobs:
           UNIVERSE: ${{ inputs.universe }}
         run: |
           python stock-similarity/similar_trends.py \
-            --request-id "$REQUEST_ID" \
-            --ticker "$TICKER" \
-            --start "$START" \
-            --end "$END" \
-            --threshold "$THRESHOLD" \
-            --mode "$MODE" \
-            --top "$TOP" \
-            --universe "$UNIVERSE" \
+            --request-id "$REQUEST_ID" --ticker "$TICKER" --start "$START" --end "$END" \
+            --threshold "$THRESHOLD" --mode "$MODE" --top "$TOP" --universe "$UNIVERSE" \
             --output "stock-similarity/results/$REQUEST_ID.json"
+      - name: Commit result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f "stock-similarity/results/${{ inputs.request_id }}.json"
+          git commit -m "stock search result ${{ inputs.request_id }}"
+          git pull --rebase origin master
+          git push origin HEAD:master
 
-      - name: Store failure result
-        if: steps.search.outcome == 'failure'
+  a-share-batch:
+    needs: prepare-a-share
+    if: inputs.scope == 'a-share' && inputs.mode == 'recent'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix: ${{ fromJSON(needs.prepare-a-share.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: master
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: stock-similarity/requirements.txt
+      - run: python -m pip install -r stock-similarity/requirements.txt
+      - name: Scan A-share batch ${{ matrix.index }}
+        continue-on-error: true
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          TICKER: ${{ inputs.ticker }}
+          START: ${{ inputs.start }}
+          END: ${{ inputs.end }}
+          THRESHOLD: ${{ inputs.threshold }}
+          TOP: ${{ inputs.top }}
+          UNIVERSE: ${{ matrix.tickers }}
+          INDEX: ${{ matrix.index }}
+        run: |
+          python stock-similarity/similar_trends.py \
+            --request-id "$REQUEST_ID" --ticker "$TICKER" --start "$START" --end "$END" \
+            --threshold "$THRESHOLD" --mode recent --provider a-share --partial --top "$TOP" \
+            --universe "$UNIVERSE" --output "/tmp/result-$INDEX.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: a-share-batch-${{ inputs.request_id }}-${{ matrix.index }}
+          path: /tmp/result-${{ matrix.index }}.json
+          retention-days: 1
+
+  merge-a-share:
+    needs: a-share-batch
+    if: inputs.scope == 'a-share' && inputs.mode == 'recent'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: master
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: a-share-batch-${{ inputs.request_id }}-*
+          path: /tmp/a-share-batches
+          merge-multiple: true
+      - name: Merge A-share batch results
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          TOP: ${{ inputs.top }}
+        run: |
+          python - <<'PY'
+          import glob
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          results = [json.load(open(path, encoding="utf-8")) for path in glob.glob("/tmp/a-share-batches/*.json")]
+          if not results:
+              raise RuntimeError("No A-share batch results were produced")
+          matches = sorted(
+              (match for result in results for match in result["matches"]),
+              key=lambda match: match["similarity_score"],
+              reverse=True,
+          )
+          query = results[0]["query"]
+          query["scope"] = "a-share"
+          query["universe_size"] = sum(result["query"]["universe_size"] for result in results)
+          output = {
+              "status": "completed",
+              "request_id": os.environ["REQUEST_ID"],
+              "completed_at": datetime.now(timezone.utc).isoformat(),
+              "query": query,
+              "matches": matches[:int(os.environ["TOP"])],
+              "total_matches": len(matches),
+              "skipped": [item for result in results for item in result["skipped"]],
+          }
+          path = f"stock-similarity/results/{os.environ['REQUEST_ID']}.json"
+          os.makedirs(os.path.dirname(path), exist_ok=True)
+          with open(path, "w", encoding="utf-8") as file:
+              json.dump(output, file, ensure_ascii=False, indent=2)
+          PY
+      - name: Commit result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f "stock-similarity/results/${{ inputs.request_id }}.json"
+          git commit -m "A-share search result ${{ inputs.request_id }}"
+          git pull --rebase origin master
+          git push origin HEAD:master
+
+  unsupported-a-share-history:
+    if: inputs.scope == 'a-share' && inputs.mode == 'historical'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: master
+      - name: Create guidance result
         env:
           REQUEST_ID: ${{ inputs.request_id }}
         run: |
@@ -101,30 +226,19 @@ jobs:
           from datetime import datetime, timezone
 
           path = f"stock-similarity/results/{os.environ['REQUEST_ID']}.json"
-          if not os.path.exists(path):
-              with open(path, "w", encoding="utf-8") as result:
-                  json.dump({
-                      "status": "error",
-                      "message": "The search workflow failed before it could produce a result. Open the workflow run for details.",
-                      "completed_at": datetime.now(timezone.utc).isoformat(),
-                      "matches": [],
-                  }, result, ensure_ascii=False, indent=2)
+          with open(path, "w", encoding="utf-8") as file:
+              json.dump({
+                  "status": "error",
+                  "message": "全市场历史模式尚未启用。请切换为自定义股票池，或使用全市场近期模式。",
+                  "completed_at": datetime.now(timezone.utc).isoformat(),
+                  "matches": [],
+              }, file, ensure_ascii=False, indent=2)
           PY
-
-      - name: Commit result
-        env:
-          REQUEST_ID: ${{ inputs.request_id }}
+      - name: Commit guidance result
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f "stock-similarity/results/$REQUEST_ID.json"
-          git commit -m "stock search result $REQUEST_ID"
+          git add -f "stock-similarity/results/${{ inputs.request_id }}.json"
+          git commit -m "stock search guidance ${{ inputs.request_id }}"
           git pull --rebase origin master
           git push origin HEAD:master
-
-      - name: Upload result artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: stock-similarity-${{ inputs.request_id }}
-          path: stock-similarity/results/${{ inputs.request_id }}.json
-          retention-days: 7

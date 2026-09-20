@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yfinance as yf
+import akshare as ak
 
 
 EPSILON = 1e-12
@@ -44,6 +45,8 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--end", required=True, type=date.fromisoformat)
     parser.add_argument("--threshold", required=True, type=float)
     parser.add_argument("--mode", required=True, choices=("recent", "historical"))
+    parser.add_argument("--provider", choices=("yahoo", "a-share"), default="yahoo")
+    parser.add_argument("--partial", action="store_true", help="Mark output as a batch result for workflow merging")
     parser.add_argument("--top", required=True, type=int)
     parser.add_argument("--universe", required=True)
     parser.add_argument("--output", required=True, type=Path)
@@ -57,10 +60,15 @@ def arguments() -> argparse.Namespace:
         parser.error("Request ID must contain only lowercase letters, digits, and hyphens")
     if not TICKER_PATTERN.fullmatch(args.ticker):
         parser.error("Target ticker contains unsupported characters")
+    if args.provider == "a-share" and (args.mode != "recent" or not re.fullmatch(r"\d{6}(?:\.(?:SS|SZ|BJ))?", args.ticker)):
+        parser.error("A-share provider supports six-digit symbols in recent mode only")
     return args
 
 
-def history(ticker: str, start: date, end: date) -> pd.DataFrame:
+def history(ticker: str, start: date, end: date, provider: str) -> pd.DataFrame:
+    if provider == "a-share":
+        ticker = yahoo_a_share_ticker(ticker)
+
     data = yf.Ticker(ticker).history(
         start=start.isoformat(),
         end=(end + timedelta(days=1)).isoformat(),
@@ -74,6 +82,18 @@ def history(ticker: str, start: date, end: date) -> pd.DataFrame:
         raise ValueError("No daily OHLCV data returned")
     data.index = pd.to_datetime(data.index).tz_localize(None).normalize()
     return data[["Open", "High", "Low", "Close", "Volume"]].dropna()
+
+
+def yahoo_a_share_ticker(ticker: str) -> str:
+    if "." in ticker:
+        return ticker
+    if ticker.startswith(("6", "9")):
+        return f"{ticker}.SS"
+    if ticker.startswith(("0", "2", "3")):
+        return f"{ticker}.SZ"
+    if ticker.startswith(("4", "8")):
+        return f"{ticker}.BJ"
+    raise ValueError("Unable to determine the A-share exchange suffix")
 
 
 def indicators(data: pd.DataFrame) -> pd.DataFrame:
@@ -183,9 +203,9 @@ def main() -> int:
         invalid_tickers = [ticker for ticker in tickers if not TICKER_PATTERN.fullmatch(ticker)]
         if invalid_tickers:
             raise ValueError(f"Unsupported ticker format: {', '.join(invalid_tickers)}")
-        if len(tickers) > 50:
+        if args.provider == "yahoo" and len(tickers) > 50:
             raise ValueError("Ticker universe is limited to 50 symbols")
-        target_data = indicators(history(args.ticker.upper(), args.start - timedelta(days=120), args.end))
+        target_data = indicators(history(args.ticker, args.start - timedelta(days=120), args.end, args.provider))
         target_window = target_data.loc[args.start.isoformat() : args.end.isoformat()].dropna()
         if target_window.empty:
             raise ValueError("The target dates do not contain sufficient complete trading-day indicator data")
@@ -194,13 +214,17 @@ def main() -> int:
         target_start = target_window.index[0].date().isoformat()
         target_end = target_window.index[-1].date().isoformat()
         today = pd.Timestamp.today().normalize().date()
-        search_start = (target_window.index[-1] - pd.DateOffset(years=8) - pd.Timedelta(days=120)).date()
+        search_start = (
+            (pd.Timestamp(today) - pd.Timedelta(days=180)).date()
+            if args.mode == "recent"
+            else (target_window.index[-1] - pd.DateOffset(years=8) - pd.Timedelta(days=120)).date()
+        )
         matches: list[Match] = []
         skipped: list[str] = []
 
         for ticker in tickers:
             try:
-                data = indicators(history(ticker, search_start, today)).dropna()
+                data = indicators(history(ticker, search_start, today, args.provider)).dropna()
                 if len(data) < window_size:
                     skipped.append(f"{ticker}: insufficient history")
                     continue
@@ -220,7 +244,7 @@ def main() -> int:
 
         matches.sort(key=lambda item: item.similarity_score, reverse=True)
         result = {
-            "status": "completed",
+            "status": "partial" if args.partial else "completed",
             "request_id": args.request_id,
             "completed_at": datetime.now(timezone.utc).isoformat(),
             "query": {
@@ -230,6 +254,7 @@ def main() -> int:
                 "trading_days": window_size,
                 "threshold": args.threshold,
                 "mode": args.mode,
+                "provider": args.provider,
                 "top": args.top,
                 "universe_size": len(tickers),
             },
