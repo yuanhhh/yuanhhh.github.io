@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.venv/
+stock-similarity/results/*.json
+!stock-similarity/results/.gitkeep
+stock-similarity/results/*.csv
+!stock-similarity/results/.gitkeep
