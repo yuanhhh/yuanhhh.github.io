@@ -15,4 +15,6 @@ The form dispatches `.github/workflows/stock-similarity.yml`. The workflow downl
 The page supports two candidate scopes:
 
 - **Custom universe**: accepts up to 50 comma-separated Yahoo Finance tickers and supports both modes.
-- **沪深京 A 股全市场**: retrieves the current A-share code list through AkShare, divides it into batches of 200 symbols, and scans up to five batches in parallel. This scope supports `recent` mode only. The workflow maps codes to Yahoo Finance `.SS`, `.SZ`, or `.BJ` symbols, uses adjusted daily OHLCV data, then merges global Top 20 results.
+- **沪深京 A 股全市场**: uses the versioned `a-share-universe.txt` list (5,565 symbols when last refreshed), divides it into batches of 200 symbols, and scans up to five batches in parallel. This scope supports `recent` mode only. The workflow maps codes to Yahoo Finance `.SS`, `.SZ`, or `.BJ` symbols, uses adjusted daily OHLCV data, then merges global Top 20 results.
+
+The list is intentionally versioned so the Actions runner does not need to fetch an exchange listing before every search. Refresh `a-share-universe.txt` periodically from a trusted A-share listing source.

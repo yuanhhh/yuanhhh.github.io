@@ -69,10 +69,6 @@ jobs:
         if: inputs.scope == 'a-share' && inputs.mode == 'recent'
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: stock-similarity/requirements.txt
-      - run: python -m pip install -r stock-similarity/requirements.txt
-        if: inputs.scope == 'a-share' && inputs.mode == 'recent'
       - id: batches
         name: Fetch A-share universe and build batches
         env:

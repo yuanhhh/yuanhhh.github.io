@@ -249,7 +249,10 @@
         }
         try {
           const payload = await fetchResult(token, requestId);
-          if (payload.status === "error") throw new Error(payload.message || "搜索失败");
+          if (payload.status === "error") {
+            setStatus(payload.message || "搜索失败", "error");
+            return;
+          }
           showResult(payload, runUrl);
           setStatus("检索完成。", "success");
           return;
