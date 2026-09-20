@@ -1,0 +1,67 @@
+{
+  "status": "completed",
+  "request_id": "search-20260920082139437-5ff5a873",
+  "completed_at": "2026-09-20T08:21:59.877410+00:00",
+  "query": {
+    "ticker": "600519.SS",
+    "start": "2026-08-20",
+    "end": "2026-09-18",
+    "trading_days": 22,
+    "threshold": 50.0,
+    "mode": "recent",
+    "top": 20,
+    "universe_size": 6
+  },
+  "matches": [
+    {
+      "ticker": "MSFT",
+      "window_start": "2026-08-19",
+      "window_end": "2026-09-18",
+      "similarity_score": 63.31,
+      "price_shape_score": 56.67,
+      "ma_shape_score": 67.66,
+      "volume_score": 55.58,
+      "indicator_score": 72.9,
+      "future_return_5d_pct": null,
+      "future_return_20d_pct": null
+    },
+    {
+      "ticker": "601318.SS",
+      "window_start": "2026-08-20",
+      "window_end": "2026-09-18",
+      "similarity_score": 57.8,
+      "price_shape_score": 62.24,
+      "ma_shape_score": 73.04,
+      "volume_score": 60.82,
+      "indicator_score": 34.51,
+      "future_return_5d_pct": null,
+      "future_return_20d_pct": null
+    },
+    {
+      "ticker": "000001.SZ",
+      "window_start": "2026-08-20",
+      "window_end": "2026-09-18",
+      "similarity_score": 53.78,
+      "price_shape_score": 55.92,
+      "ma_shape_score": 66.47,
+      "volume_score": 52.89,
+      "indicator_score": 38.62,
+      "future_return_5d_pct": null,
+      "future_return_20d_pct": null
+    },
+    {
+      "ticker": "300750.SZ",
+      "window_start": "2026-08-20",
+      "window_end": "2026-09-18",
+      "similarity_score": 53.01,
+      "price_shape_score": 50.9,
+      "ma_shape_score": 56.93,
+      "volume_score": 43.57,
+      "indicator_score": 57.72,
+      "future_return_5d_pct": null,
+      "future_return_20d_pct": null
+    }
+  ],
+  "total_matches": 4,
+  "skipped": []
+}
