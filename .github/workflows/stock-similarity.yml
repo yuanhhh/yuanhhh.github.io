@@ -43,7 +43,8 @@ on:
         type: string
       universe:
         description: Comma-separated Yahoo Finance ticker universe for custom mode
-        required: true
+        required: false
+        default: ""
         type: string
 
 permissions:
