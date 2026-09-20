@@ -56,23 +56,45 @@ concurrency:
 
 jobs:
   prepare-a-share:
-    if: inputs.scope == 'a-share' && inputs.mode == 'recent'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.batches.outputs.matrix }}
+      ready: ${{ steps.batches.outputs.ready }}
+      error: ${{ steps.batches.outputs.error }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: master
       - uses: actions/setup-python@v5
+        if: inputs.scope == 'a-share' && inputs.mode == 'recent'
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: stock-similarity/requirements.txt
       - run: python -m pip install -r stock-similarity/requirements.txt
+        if: inputs.scope == 'a-share' && inputs.mode == 'recent'
       - id: batches
         name: Fetch A-share universe and build batches
-        run: echo "matrix=$(python stock-similarity/a_share_batches.py)" >> "$GITHUB_OUTPUT"
+        env:
+          SCOPE: ${{ inputs.scope }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          empty_matrix='{"include":[]}'
+          printf 'matrix=%s\n' "$empty_matrix" >> "$GITHUB_OUTPUT"
+          printf 'ready=false\n' >> "$GITHUB_OUTPUT"
+          printf 'error=\n' >> "$GITHUB_OUTPUT"
+
+          if [ "$SCOPE" != "a-share" ] || [ "$MODE" != "recent" ]; then
+            exit 0
+          fi
+
+          if matrix=$(python stock-similarity/a_share_batches.py 2>/tmp/a-share-batches.err); then
+            printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+            printf 'ready=true\n' >> "$GITHUB_OUTPUT"
+          else
+            message=$(tr '\n' ' ' < /tmp/a-share-batches.err | cut -c1-500)
+            printf 'error=%s\n' "${message:-无法获取 A 股股票清单。}" >> "$GITHUB_OUTPUT"
+          fi
 
   custom-search:
     if: inputs.scope == 'custom'
@@ -113,7 +135,7 @@ jobs:
 
   a-share-batch:
     needs: prepare-a-share
-    if: inputs.scope == 'a-share' && inputs.mode == 'recent'
+    if: inputs.scope == 'a-share' && inputs.mode == 'recent' && needs.prepare-a-share.outputs.ready == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -153,8 +175,8 @@ jobs:
           retention-days: 1
 
   merge-a-share:
-    needs: a-share-batch
-    if: inputs.scope == 'a-share' && inputs.mode == 'recent'
+    needs: [prepare-a-share, a-share-batch]
+    if: inputs.scope == 'a-share' && inputs.mode == 'recent' && needs.prepare-a-share.outputs.ready == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -207,6 +229,42 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f "stock-similarity/results/${{ inputs.request_id }}.json"
           git commit -m "A-share search result ${{ inputs.request_id }}"
+          git pull --rebase origin master
+          git push origin HEAD:master
+
+  a-share-universe-error:
+    needs: prepare-a-share
+    if: inputs.scope == 'a-share' && inputs.mode == 'recent' && needs.prepare-a-share.outputs.ready != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: master
+      - name: Create unavailable-universe result
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          ERROR_MESSAGE: ${{ needs.prepare-a-share.outputs.error }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          path = f"stock-similarity/results/{os.environ['REQUEST_ID']}.json"
+          with open(path, "w", encoding="utf-8") as file:
+              json.dump({
+                  "status": "error",
+                  "message": f"无法获取 A 股股票清单。{os.environ['ERROR_MESSAGE']}",
+                  "completed_at": datetime.now(timezone.utc).isoformat(),
+                  "matches": [],
+              }, file, ensure_ascii=False, indent=2)
+          PY
+      - name: Commit error result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f "stock-similarity/results/${{ inputs.request_id }}.json"
+          git commit -m "A-share universe error ${{ inputs.request_id }}"
           git pull --rebase origin master
           git push origin HEAD:master
 
