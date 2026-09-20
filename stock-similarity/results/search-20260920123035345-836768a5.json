@@ -1,0 +1,19 @@
+{
+  "status": "completed",
+  "request_id": "search-20260920123035345-836768a5",
+  "completed_at": "2026-09-20T12:30:59.332469+00:00",
+  "query": {
+    "ticker": "601328.SS",
+    "start": "2026-08-20",
+    "end": "2026-09-18",
+    "trading_days": 22,
+    "threshold": 95.0,
+    "mode": "recent",
+    "provider": "yahoo",
+    "top": 20,
+    "universe_size": 6
+  },
+  "matches": [],
+  "total_matches": 0,
+  "skipped": []
+}
