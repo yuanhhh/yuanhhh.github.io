@@ -1,0 +1,19 @@
+{
+  "status": "completed",
+  "request_id": "search-20260921025239571-1ec179fc",
+  "completed_at": "2026-09-21T02:53:06.908438+00:00",
+  "query": {
+    "ticker": "600519.SS",
+    "start": "2026-08-21",
+    "end": "2026-09-18",
+    "trading_days": 21,
+    "threshold": 95.0,
+    "mode": "recent",
+    "provider": "yahoo",
+    "top": 20,
+    "universe_size": 6
+  },
+  "matches": [],
+  "total_matches": 0,
+  "skipped": []
+}
