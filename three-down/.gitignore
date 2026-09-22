@@ -1,0 +1,5 @@
+__pycache__/
+three_down_cache.jsonl.gz
+results/*.csv
+results/*.json
+!results/.gitkeep

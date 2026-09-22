@@ -1,0 +1,195 @@
+name: Three Down Stock Screener
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        required: true
+        type: string
+      cmd:
+        required: true
+        default: recent
+        type: choice
+        options: [recent, hist, sim]
+      start:
+        required: false
+        type: string
+      end:
+        required: false
+        type: string
+      top:
+        required: false
+        type: string
+      workers:
+        required: false
+        type: string
+      source:
+        required: false
+        type: choice
+        options: [auto, sina, tencent]
+      limit:
+        required: false
+        type: string
+      refresh:
+        required: false
+        type: boolean
+      count:
+        required: false
+        type: string
+      per_day:
+        required: false
+        type: string
+      out:
+        required: false
+        type: string
+      min_decline:
+        required: false
+        type: string
+      max_decline:
+        required: false
+        type: string
+      w_shrink:
+        required: false
+        type: string
+      w_decline:
+        required: false
+        type: string
+      take:
+        required: false
+        type: string
+      trail:
+        required: false
+        type: string
+      stop:
+        required: false
+        type: string
+      hold:
+        required: false
+        type: string
+      fee:
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: three-down-${{ inputs.request_id }}
+  cancel-in-progress: false
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: master
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: three-down/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r three-down/requirements.txt
+      - name: Run screener
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          CMD: ${{ inputs.cmd }}
+          START: ${{ inputs.start }}
+          END: ${{ inputs.end }}
+          TOP: ${{ inputs.top }}
+          WORKERS: ${{ inputs.workers }}
+          SOURCE: ${{ inputs.source }}
+          LIMIT: ${{ inputs.limit }}
+          REFRESH: ${{ inputs.refresh }}
+          COUNT: ${{ inputs.count }}
+          PER_DAY: ${{ inputs.per_day }}
+          OUT: ${{ inputs.out }}
+          MIN_DECLINE: ${{ inputs.min_decline }}
+          MAX_DECLINE: ${{ inputs.max_decline }}
+          W_SHRINK: ${{ inputs.w_shrink }}
+          W_DECLINE: ${{ inputs.w_decline }}
+          TAKE: ${{ inputs.take }}
+          TRAIL: ${{ inputs.trail }}
+          STOP: ${{ inputs.stop }}
+          HOLD: ${{ inputs.hold }}
+          FEE: ${{ inputs.fee }}
+        run: |
+          set -euo pipefail
+          case "$CMD" in
+            recent) ;;
+            hist) test -n "$START" || { echo "hist mode requires start" >&2; exit 2; } ;;
+            sim)
+              test -n "$START" || { echo "sim mode requires start" >&2; exit 2; }
+              test -n "$END" || { echo "sim mode requires end" >&2; exit 2; }
+              [[ "$START" < "$END" || "$START" == "$END" ]] || { echo "start must not be later than end" >&2; exit 2; }
+              ;;
+            *) echo "unsupported command: $CMD" >&2; exit 2 ;;
+          esac
+
+          result_name="${REQUEST_ID}.csv"
+          if [ -n "$OUT" ]; then
+            [[ "$OUT" =~ ^[A-Za-z0-9._-]+\.csv$ ]] || { echo "out must be a CSV filename" >&2; exit 2; }
+            result_name="${REQUEST_ID}-${OUT}"
+          fi
+
+          args=("$CMD" "--out" "results/$result_name")
+          add_arg() { if [ -n "$2" ]; then args+=("$1" "$2"); fi; }
+          add_arg --start "$START"
+          add_arg --end "$END"
+          add_arg --top "$TOP"
+          add_arg --workers "$WORKERS"
+          add_arg --source "$SOURCE"
+          add_arg --limit "$LIMIT"
+          add_arg --count "$COUNT"
+          add_arg --per-day "$PER_DAY"
+          add_arg --min-decline "$MIN_DECLINE"
+          add_arg --max-decline "$MAX_DECLINE"
+          add_arg --w-shrink "$W_SHRINK"
+          add_arg --w-decline "$W_DECLINE"
+          add_arg --take "$TAKE"
+          add_arg --trail "$TRAIL"
+          add_arg --stop "$STOP"
+          add_arg --hold "$HOLD"
+          add_arg --fee "$FEE"
+          if [ "$REFRESH" = "true" ]; then args+=("--refresh"); fi
+
+          cd three-down
+          python three_down.py "${args[@]}"
+          REQUEST_ID="$REQUEST_ID" CMD="$CMD" OUTPUT="results/$result_name" python - <<'PY'
+          import csv
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          request_id = os.environ["REQUEST_ID"]
+          output = os.environ["OUTPUT"]
+          rows = []
+          if os.path.exists(output):
+              with open(output, encoding="utf-8-sig", newline="") as file:
+                  rows = list(csv.DictReader(file))
+          inputs = {key.lower(): value for key, value in os.environ.items() if key in {
+              "CMD", "START", "END", "TOP", "WORKERS", "SOURCE", "LIMIT", "REFRESH", "COUNT", "PER_DAY", "OUT",
+              "MIN_DECLINE", "MAX_DECLINE", "W_SHRINK", "W_DECLINE", "TAKE", "TRAIL", "STOP", "HOLD", "FEE"
+          } and value not in ("", "false")}
+          with open(f"results/{request_id}.json", "w", encoding="utf-8") as file:
+              json.dump({
+                  "status": "completed",
+                  "request_id": request_id,
+                  "completed_at": datetime.now(timezone.utc).isoformat(),
+                  "command": os.environ["CMD"],
+                  "inputs": inputs,
+                  "output": output,
+                  "summary": f"已完成 {os.environ['CMD']} 模式扫描，共 {len(rows)} 条结果。",
+                  "rows": rows,
+              }, file, ensure_ascii=False, indent=2)
+          PY
+      - name: Commit result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f "three-down/results/${{ inputs.request_id }}.json"
+          git add -f "three-down/results/${{ inputs.request_id }}"*.csv 2>/dev/null || true
+          git commit -m "three down result ${{ inputs.request_id }}"
+          git pull --rebase origin master
+          git push origin HEAD:master
