@@ -13,6 +13,7 @@ import requests
 
 WORK = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.join(WORK, "three_down_cache.jsonl.gz")
+UNIVERSE = os.path.normpath(os.path.join(WORK, "..", "stock-similarity", "a-share-universe.txt"))
 SINA = "https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20_=/CN_MarketDataService.getKLineData?symbol={}&scale=240&ma=no&datalen={}"
 TENCENT = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={},day,,{},qfq"
 HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://finance.sina.com.cn"}
@@ -70,13 +71,9 @@ def cache_save(cache):
 
 
 def universe():
-    import akshare as ak
-    result = []
-    for code, name in zip(ak.stock_info_a_code_name()["code"], ak.stock_info_a_code_name()["name"]):
-        code, name = str(code), str(name).replace(" ", "")
-        if len(code) == 6 and code.startswith(("60", "68", "00", "30")) and "ST" not in name and "退" not in name:
-            result.append((code, name))
-    return result
+    with open(UNIVERSE, encoding="utf-8") as file:
+        codes = [line.strip() for line in file]
+    return [(code, code) for code in codes if len(code) == 6 and code.startswith(("60", "68", "00", "30"))]
 
 
 def gather(items, args):

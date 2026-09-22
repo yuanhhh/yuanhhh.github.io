@@ -10,6 +10,8 @@
 
 Token 只保留在当前页面内存，不会写入仓库或浏览器存储。
 
+选股范围使用仓库中 `stock-similarity/a-share-universe.txt` 的版本化 A 股清单，避免 GitHub Actions 在运行时依赖 AkShare 的交易所列表接口。
+
 ## 参数校验
 
 - `recent` 不要求日期。
