@@ -1,0 +1,47 @@
+name: Scheduled Email
+
+on:
+  schedule:
+    # Weekdays at 09:17 in China Standard Time. Change this to suit your needs.
+    - cron: "17 9 * * 1-5"
+      timezone: "Asia/Shanghai"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Validate settings and message without sending an email
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scheduled-email
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Send scheduled email
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          MAIL_SUBJECT: ${{ secrets.MAIL_SUBJECT }}
+          SMTP_USE_SSL: ${{ secrets.SMTP_USE_SSL }}
+          SMTP_STARTTLS: ${{ secrets.SMTP_STARTTLS }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python scheduled-email/send_email.py --dry-run
+          else
+            python scheduled-email/send_email.py
+          fi
