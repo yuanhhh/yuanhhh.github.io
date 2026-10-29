@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>星期一的早安</title>
+<style>
+  @keyframes rise { 50% { transform: translateY(-9px) scale(1.04); } }
+  @keyframes glow { 50% { opacity: .45; transform: scale(1.22); } }
+  .sun { animation: rise 4s ease-in-out infinite; } .glow { animation: glow 3s ease-in-out infinite; }
+  @media only screen and (max-width: 600px) { .shell { width: 100% !important; } .pad { padding: 28px 20px !important; } }
+</style></head>
+<body style="margin:0;padding:0;background:#fff7ed;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;color:#4a3027;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fff7ed;"><tr><td align="center" style="padding:28px 12px;">
+    <table class="shell" role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:600px;max-width:600px;background:#fffdf9;border-radius:28px;overflow:hidden;box-shadow:0 12px 35px rgba(205,116,55,.16);">
+      <tr><td class="pad" style="padding:38px 44px;background:linear-gradient(135deg,#ffd7a4,#fff0cf 62%,#ffe4c5);text-align:center;">
+        <div class="glow" style="margin:auto;width:105px;height:105px;border-radius:50%;background:#ffbb5c;opacity:.7;"></div>
+        <div class="sun" style="font-size:58px;line-height:1;margin-top:-82px;position:relative;">☀️</div>
+        <p style="margin:22px 0 7px;font-size:13px;letter-spacing:2px;color:#a35b2d;">{{today}} · {{weekday}}</p>
+        <h1 style="margin:0;font-size:30px;font-weight:700;color:#7e3d1f;">新的一周，早安呀</h1>
+        <p style="margin:12px 0 0;font-size:16px;color:#9a5630;">愿阳光先落在你的肩上</p>
+      </td></tr>
+      <tr><td class="pad" style="padding:30px 44px 38px;">
+        <p style="margin:0 0 16px;text-align:center;color:#ad6d43;font-size:14px;">我们已经一起走过</p>
+        <p style="margin:0;text-align:center;font-size:52px;font-weight:800;line-height:1;color:#e77939;">{{wedding_days}} <span style="font-size:17px;font-weight:500;">天</span></p>
+        <div style="margin:29px 0 18px;padding:20px;border-radius:18px;background:#fff3e1;">
+          <p style="margin:0 0 8px;font-size:17px;font-weight:700;">{{weather_icon}} 武汉 · {{weather_condition}}</p>
+          <p style="margin:0;color:#9d6340;font-size:14px;">{{temperature}} · {{feels_like}}　{{temperature_range}}</p>
+          <p style="margin:12px 0 0;color:#8b4b28;font-size:14px;line-height:1.7;">{{weather_advice}}</p>
+        </div>
+        <div style="padding:16px 18px;border-left:3px solid #f3a761;background:#fffaf2;border-radius:0 14px 14px 0;font-size:14px;line-height:1.7;color:#85573e;"><strong>🌙 {{lunar_date}}</strong><br>{{special_day}}</div>
+        <p style="margin:27px 0 0;text-align:center;color:#c18459;font-size:13px;">把今天过成温柔的开始 ♡</p>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>星期二的晴空</title>
+<style>
+  @keyframes drift { 50% { transform:translateX(18px); } } @keyframes bob { 50% { transform:translateY(-8px); } }
+  .cloud { animation:drift 8s ease-in-out infinite; } .kite { animation:bob 3s ease-in-out infinite; }
+  @media only screen and (max-width:600px){.shell{width:100%!important}.pad{padding:27px 20px!important}}
+</style></head>
+<body style="margin:0;padding:0;background:#ecf8ff;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;color:#183852;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:28px 12px;">
+<table class="shell" role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:600px;max-width:600px;background:#fff;border-radius:28px;overflow:hidden;box-shadow:0 14px 38px rgba(32,132,192,.16);"><tr><td class="pad" style="padding:35px 44px;background:linear-gradient(135deg,#a8e7ff,#e9faff 60%,#c9eeff);text-align:center;">
+<div class="cloud" style="font-size:35px;text-align:left;opacity:.75;">☁️</div><div class="kite" style="font-size:50px;margin:-12px 0 7px;">🪁</div><p style="margin:0;color:#337aa6;font-size:13px;letter-spacing:2px;">{{today}} · {{weekday}}</p><h1 style="margin:9px 0 0;font-size:30px;color:#19608e;">天空很蓝，想你很甜</h1><p style="margin:11px 0 0;color:#4485ad;">周二也要元气满满</p>
+</td></tr><tr><td class="pad" style="padding:31px 44px 39px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td width="48%" style="padding:18px;border-radius:18px;background:#eaf8ff;text-align:center;"><p style="margin:0;color:#5a9abf;font-size:13px;">相爱进度</p><p style="margin:7px 0 0;color:#2384bb;font-size:34px;font-weight:800;">{{wedding_days}} 天</p></td><td width="4%"></td><td width="48%" style="padding:18px;border-radius:18px;background:#f3fbff;text-align:center;"><p style="margin:0;color:#5a9abf;font-size:13px;">今日农历</p><p style="margin:9px 0 0;color:#2384bb;font-size:16px;font-weight:700;">{{lunar_date}}</p></td></tr></table>
+<div style="margin-top:20px;padding:21px;border-radius:18px;background:linear-gradient(135deg,#f1fbff,#dff5ff);"><p style="margin:0;font-size:18px;font-weight:700;">{{weather_icon}} 武汉 {{weather_condition}} <span style="font-size:14px;font-weight:400;">{{temperature}}</span></p><p style="margin:9px 0 0;color:#4e7e99;font-size:14px;">{{feels_like}}　·　{{temperature_range}}</p><p style="margin:12px 0 0;color:#24729c;font-size:14px;line-height:1.7;">{{weather_advice}}</p></div>
+<p style="margin:22px 3px 0;padding:15px 17px;border-radius:14px;background:#f8fcff;color:#47748d;font-size:14px;line-height:1.7;">💌 {{special_day}}</p><p style="margin:25px 0 0;text-align:center;color:#75aeca;font-size:13px;">今天也要朝着幸福，轻轻飞翔 ♡</p></td></tr></table>
+</td></tr></table></body></html>
