@@ -2,8 +2,8 @@ name: Scheduled Email
 
 on:
   schedule:
-    # Every day at 08:00 in China Standard Time.
-    - cron: "0 8 * * *"
+    # Every day at 08:35 in China Standard Time.
+    - cron: "35 8 * * *"
       timezone: "Asia/Shanghai"
   workflow_dispatch:
     inputs:

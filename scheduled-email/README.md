@@ -1,6 +1,6 @@
 # GitHub Actions 定时邮件
 
-此目录包含一个通过 SMTP 发送浪漫日常邮件的 Python 程序。工作流文件位于 [`.github/workflows/scheduled-email.yml`](../.github/workflows/scheduled-email.yml)，默认在 **Asia/Shanghai 时区每天 08:00** 运行；也可以从 GitHub Actions 页面手动执行。
+此目录包含一个通过 SMTP 发送浪漫日常邮件的 Python 程序。工作流文件位于 [`.github/workflows/scheduled-email.yml`](../.github/workflows/scheduled-email.yml)，默认在 **Asia/Shanghai 时区每天 08:35** 运行；也可以从 GitHub Actions 页面手动执行。
 
 ## 1. 编辑邮件内容
 
@@ -36,7 +36,7 @@
 
 ```yaml
 schedule:
-  - cron: "0 8 * * *"
+  - cron: "35 8 * * *"
     timezone: "Asia/Shanghai"
 ```
 
