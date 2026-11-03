@@ -25,22 +25,31 @@ function chartElement(id) {
   };
 }
 
-test("three-way sum is calculated in fen before converting to 亿元", () => {
-  assert.equal(seriesValue(values, "sum"), 60000000000);
-  assert.equal(format(seriesValue(values, "sum")), "6.00");
+test("沪深合计不重复计算科创板，且以亿元显示", () => {
+  assert.equal(seriesValue(values, "sum"), 50000000000);
+  assert.equal(format(seriesValue(values, "sum")), "5.00");
   const table = { innerHTML: "" };
   renderTable(table, [{ date: "2026-11-03", values }], row => row.date);
-  assert.match(table.innerHTML, /<td>2\.00<\/td><td>3\.00<\/td><td>1\.00<\/td><td>6\.00<\/td><td>5\.00<\/td>/);
+  assert.match(table.innerHTML, /<td>2\.00<\/td><td>3\.00<\/td><td>1\.00<\/td><td>5\.00<\/td>/);
+  assert.equal((table.innerHTML.match(/<td>/g) || []).length, 5);
 });
 
 test("grouped chart draws four series with a shared labelled scale", () => {
   const chart = chartElement("daily-chart"), axis = { innerHTML: "" };
   renderChart(chart, axis, [{ date: "2026-11-03", values }], row => row.date.slice(5), "all");
   assert.equal((chart.innerHTML.match(/class="bar /g) || []).length, 4);
-  assert.match(chart.innerHTML, /class="bar sum"[^>]*title="2026-11-03 · 三项相加（重复计算科创板）：6\.00 亿元"/);
+  assert.match(chart.innerHTML, /class="bar sum"[^>]*title="2026-11-03 · 沪深合计：5\.00 亿元"/);
   assert.match(axis.innerHTML, />8\.00<\/span>/);
   assert.match(axis.innerHTML, />0\.00<\/span>/);
   assert.equal(chart.classList.single, false);
+});
+
+test("分时沪深合计也只使用沪市和深市", () => {
+  const chart = chartElement("hourly-chart"), axis = { innerHTML: "" };
+  const rows = [{ period: "09:30–10:30", values, partial: true }];
+  renderChart(chart, axis, rows, row => row.period, "sum");
+  assert.match(chart.innerHTML, /class="bar-value">5\.00/);
+  assert.match(chart.attrs["aria-label"], /沪深合计/);
 });
 
 test("individual series rescales and shows values and partial status", () => {
@@ -56,7 +65,7 @@ test("individual series rescales and shows values and partial status", () => {
   assert.equal(chart.classList.single, true);
   const table = { innerHTML: "" };
   renderTable(table, rows, row => row.period);
-  assert.match(table.innerHTML, /<td>—<\/td><td>—<\/td><td>—<\/td><td>—<\/td><td>—<\/td>/);
+  assert.match(table.innerHTML, /<td>—<\/td><td>—<\/td><td>—<\/td><td>—<\/td>/);
 });
 
 test("rejects old volume payloads so they cannot be labelled as turnover", () => {
