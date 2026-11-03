@@ -1,7 +1,9 @@
 import unittest
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
-from fetch_volume import MARKETS, SHANGHAI, build_payload, expected_minutes, parse_daily, parse_minutes
+from fetch_volume import (MARKETS, SHANGHAI, build_payload, expected_minutes, fetch, get_data,
+                          get_tencent_data, parse_daily, parse_minutes, parse_tencent_daily, parse_tencent_minutes)
 
 
 def make_daily(last_date="2026-11-03"):
@@ -84,6 +86,75 @@ class VolumeTests(unittest.TestCase):
             parse_minutes({"trends": ["2026-11-03 12:00,1,1,1,1,2,0"]})
         with self.assertRaises(ValueError):
             parse_minutes({"trends": ["2026-11-03 09:30,1,1,1,1,2,0"] * 2})
+
+    def test_tencent_daily_uses_hands_and_rejects_fractional_volume(self):
+        self.assertEqual(parse_tencent_daily({"day": [["2026-11-03", "1", "1", "1", "1", "49600012.000"]]}), {"2026-11-03": 49600012})
+        with self.assertRaises(ValueError):
+            parse_tencent_daily({"day": [["2026-11-03", "1", "1", "1", "1", "1.5"]]})
+
+    def test_tencent_cumulative_minutes_include_auction_and_ignore_lunch_marker(self):
+        data = {"data": {"date": "20261103", "data": [
+            "0930 10 5 0", "0931 10 11 0", "1130 10 50 0",
+            "1300 10 50 0", "1301 10 70 0", "1500 10 95 0",
+        ]}}
+        result = parse_tencent_minutes(data)
+        self.assertEqual(list(result.values()), [5, 6, 39, 20, 25])
+        self.assertNotIn("2026-11-03 13:00", result)
+        self.assertEqual(sum(result.values()), 95)
+
+    def test_tencent_rejects_invalid_lunch_and_falling_cumulative_volume(self):
+        with self.assertRaisesRegex(ValueError, "午休"):
+            parse_tencent_minutes({"data": {"date": "20261103", "data": ["1130 10 50 0", "1300 10 51 0"]}})
+        with self.assertRaisesRegex(ValueError, "累计成交量"):
+            parse_tencent_minutes({"data": {"date": "20261103", "data": ["0930 10 10 0", "0931 10 9 0"]}})
+
+    def test_bad_provider_response_is_rejected(self):
+        with patch("fetch_volume.get_json", return_value=[]):
+            with self.assertRaises(ValueError):
+                get_data("kline", "1.000002")
+        with patch("fetch_volume.get_json", return_value={"code": 0, "data": []}):
+            with self.assertRaises(ValueError):
+                get_tencent_data("minute", "sh000002")
+        with self.assertRaises(ValueError):
+            parse_tencent_minutes({"data": {"date": "20261103", "data": [None]}})
+
+    def test_uses_tencent_before_fallback(self):
+        daily = make_daily()
+        minutes = {key: {} for key in MARKETS}
+        with patch("fetch_volume.fetch_tencent", return_value=(daily, minutes)) as primary, \
+             patch("fetch_volume.fetch_eastmoney") as fallback, \
+             patch("fetch_volume.build_payload", return_value={"source": "腾讯财经"}) as build:
+            self.assertEqual(fetch(datetime(2026, 11, 3, 10, tzinfo=SHANGHAI))["source"], "腾讯财经")
+            primary.assert_called_once()
+            fallback.assert_not_called()
+            self.assertIn("腾讯财经", build.call_args.args[3])
+
+    def test_falls_back_to_complete_eastmoney_snapshot(self):
+        daily = make_daily()
+        minutes = {key: {} for key in MARKETS}
+        with patch("fetch_volume.fetch_tencent", side_effect=RuntimeError("connection closed")), \
+             patch("fetch_volume.fetch_eastmoney", return_value=(daily, minutes)) as fallback, \
+             patch("fetch_volume.build_payload", return_value={"source": "东方财富"}) as build:
+            self.assertEqual(fetch(datetime(2026, 11, 3, 10, tzinfo=SHANGHAI))["source"], "东方财富")
+            fallback.assert_called_once()
+            self.assertIs(build.call_args.args[0], daily)
+            self.assertIs(build.call_args.args[1], minutes)
+            self.assertIn("东方财富", build.call_args.args[3])
+
+    def test_invalid_primary_data_also_triggers_full_fallback(self):
+        daily = make_daily()
+        minutes = {key: {} for key in MARKETS}
+        with patch("fetch_volume.fetch_tencent", return_value=(daily, minutes)), \
+             patch("fetch_volume.fetch_eastmoney", return_value=(daily, minutes)) as fallback, \
+             patch("fetch_volume.build_payload", side_effect=[ValueError("incomplete"), {"source": "东方财富"}]):
+            self.assertEqual(fetch(datetime(2026, 11, 3, 10, tzinfo=SHANGHAI))["source"], "东方财富")
+            fallback.assert_called_once()
+
+    def test_reports_both_sources_when_unavailable(self):
+        with patch("fetch_volume.fetch_tencent", side_effect=RuntimeError("腾讯故障")), \
+             patch("fetch_volume.fetch_eastmoney", side_effect=RuntimeError("东方财富故障")):
+            with self.assertRaisesRegex(RuntimeError, "腾讯故障.*东方财富故障"):
+                fetch(datetime(2026, 11, 3, 10, tzinfo=SHANGHAI))
 
 
 if __name__ == "__main__":

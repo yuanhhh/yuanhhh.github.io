@@ -108,7 +108,7 @@
           <details><summary>查看分时数据</summary><div class="table-scroll"><table><thead><tr><th>时段</th><th>沪市 A 股</th><th>深市 A 股</th><th>科创板</th><th>沪深合计</th></tr></thead><tbody id="hourly-table"></tbody></table></div></details>
         </div>
       </section>
-      <p class="note">来源：东方财富指数行情（上证 A 股指数、深证 A 指、科创综指）；科创综指按数据源口径展示，并非保证覆盖全部科创板股票。行情可能延迟，仅供参考。</p>
+      <p class="note"><span id="source">来源：腾讯财经或东方财富指数行情（上证 A 股指数、深证 A 指、科创综指）</span>；科创综指按数据源口径展示，并非保证覆盖全部科创板股票。行情可能延迟，仅供参考。</p>
     </main>
     <footer>© Yuanhui</footer>
   </div>
@@ -175,6 +175,7 @@
     }
 
     function render(payload) {
+      $("source").textContent = `来源：${typeof payload.source === "string" ? payload.source : "指数行情"}`;
       renderChart($("daily-chart"), payload.daily, row => row.date.slice(5));
       renderTable($("daily-table"), [...payload.daily].reverse(), row => row.date);
       $("daily-empty").hidden = true; $("daily-content").hidden = false;

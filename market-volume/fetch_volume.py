@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch Eastmoney index volumes and group today's minute data by trading hour."""
+"""Fetch index volumes and group today's minute data by trading hour."""
 
 import argparse
 import json
@@ -26,27 +26,104 @@ PERIODS = (
     ("14:00–15:00", "14:00", "15:00"),
 )
 API_ROOT = "https://push2his.eastmoney.com/api/qt/stock"
+TENCENT_ROOT = "https://web.ifzq.gtimg.cn/appstock/app"
 FIELDS = {"fields1": "f1,f2,f3,f4,f5,f6", "fields2": "f51,f52,f53,f54,f55,f56,f57", "ut": "7eea3edcaed734bea9cbfc24409ed989"}
+
+
+def get_json(url, label, referer):
+    for attempt in range(3):
+        try:
+            request = Request(url, headers={"User-Agent": "Mozilla/5.0", "Referer": referer})
+            with urlopen(request, timeout=20) as response:
+                return json.load(response)
+        except (OSError, ValueError, KeyError) as error:
+            if attempt == 2:
+                raise RuntimeError(f"无法获取 {label}: {error}") from error
+            time.sleep(attempt + 1)
 
 
 def get_data(kind, secid, **extra):
     params = {**FIELDS, "secid": secid, **extra}
     url = f"{API_ROOT}/{kind}/get?{urlencode(params)}"
-    for attempt in range(3):
-        try:
-            request = Request(url, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://quote.eastmoney.com/"})
-            with urlopen(request, timeout=20) as response:
-                result = json.load(response)
-            if result.get("rc") != 0 or not isinstance(result.get("data"), dict):
-                raise ValueError(f"行情接口返回空数据: {secid} {kind}")
-            return result["data"]
-        except (OSError, ValueError, KeyError) as error:
-            if attempt == 2:
-                raise RuntimeError(f"无法获取 {secid} {kind}: {error}") from error
-            time.sleep(attempt + 1)
+    result = get_json(url, f"{secid} {kind}", "https://quote.eastmoney.com/")
+    if not isinstance(result, dict) or result.get("rc") != 0 or not isinstance(result.get("data"), dict):
+        raise ValueError(f"东方财富行情接口返回空数据: {secid} {kind}")
+    return result["data"]
+
+
+def get_tencent_data(kind, symbol):
+    if kind == "day":
+        path, params = "kline/kline", {"param": f"{symbol},day,,,60"}
+    else:
+        path, params = "minute/query", {"code": symbol}
+    # Avoid a cached minute snapshot when refreshing during trading hours.
+    params["_"] = int(time.time() * 1000)
+    result = get_json(f"{TENCENT_ROOT}/{path}?{urlencode(params)}", f"腾讯 {symbol} {kind}", "https://gu.qq.com/")
+    if not isinstance(result, dict) or result.get("code") != 0:
+        raise ValueError(f"腾讯行情接口返回错误: {symbol} {kind}")
+    markets = result.get("data")
+    data = markets.get(symbol) if isinstance(markets, dict) else None
+    if not isinstance(data, dict):
+        raise ValueError(f"腾讯行情接口返回空数据: {symbol} {kind}")
+    return data
+
+
+def tencent_volume(value):
+    value = str(value)
+    if not re.fullmatch(r"\d+(?:\.0+)?", value):
+        raise ValueError("腾讯成交量无效")
+    return int(value.split(".")[0])  # Both index endpoints report hands.
+
+
+def parse_tencent_daily(data):
+    rows = data.get("day")
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("腾讯日线数据为空")
+    result = {}
+    for row in rows:
+        if not isinstance(row, list) or len(row) < 6:
+            raise ValueError("腾讯日线记录无效")
+        date = row[0]
+        datetime.strptime(date, "%Y-%m-%d")
+        if date in result:
+            raise ValueError(f"重复的交易日: {date}")
+        result[date] = tencent_volume(row[5])
+    return result
+
+
+def parse_tencent_minutes(data):
+    data = data.get("data")
+    if not isinstance(data, dict) or not isinstance(data.get("data"), list):
+        raise ValueError("腾讯分时数据为空")
+    date = datetime.strptime(data.get("date", ""), "%Y%m%d").strftime("%Y-%m-%d")
+    result, previous, last_stamp = {}, 0, ""
+    for row in data["data"]:
+        if not isinstance(row, str):
+            raise ValueError("腾讯分时记录无效")
+        parts = row.split()
+        if len(parts) < 3 or not re.fullmatch(r"\d{4}", parts[0]):
+            raise ValueError("腾讯分时记录无效")
+        clock = parts[0][:2] + ":" + parts[0][2:]
+        stamp = f"{date} {clock}"
+        cumulative = tencent_volume(parts[2])
+        if stamp <= last_stamp or cumulative < previous:
+            raise ValueError("腾讯分时记录时间或累计成交量异常")
+        if clock == "13:00":
+            # Tencent repeats the last morning value at 13:00; it is not a new minute.
+            if last_stamp != f"{date} 11:30" or cumulative != previous:
+                raise ValueError("腾讯午休分时记录异常")
+            last_stamp = stamp
+            continue
+        if not ("09:30" <= clock <= "11:30" or "13:01" <= clock <= "15:00"):
+            raise ValueError(f"不支持的分时时间: {stamp}")
+        result[stamp] = cumulative - previous
+        previous, last_stamp = cumulative, stamp
+    return result
 
 
 def volume(row):
+    if not isinstance(row, str):
+        raise ValueError("行情记录无效")
     parts = row.split(",")
     if len(parts) < 6 or not re.fullmatch(r"\d+", parts[5]):
         raise ValueError("行情成交量无效")
@@ -59,6 +136,8 @@ def parse_daily(data):
         raise ValueError("日线数据为空")
     result = {}
     for row in rows:
+        if not isinstance(row, str):
+            raise ValueError("日线记录无效")
         date = row.split(",", 1)[0]
         datetime.strptime(date, "%Y-%m-%d")
         if date in result:
@@ -73,6 +152,8 @@ def parse_minutes(data):
         raise ValueError("分时数据为空")
     result = {}
     for row in rows:
+        if not isinstance(row, str):
+            raise ValueError("分时记录无效")
         stamp = row.split(",", 1)[0]
         parsed = datetime.strptime(stamp, "%Y-%m-%d %H:%M")
         clock = parsed.strftime("%H:%M")
@@ -97,7 +178,7 @@ def expected_minutes(date, latest):
     return result
 
 
-def build_payload(daily, minutes, now):
+def build_payload(daily, minutes, now, source="东方财富指数行情：上证A股指数、深证A指、科创综指"):
     today = now.astimezone(SHANGHAI).date().isoformat()
     date_sets = [set(daily[key]) for key in MARKETS]
     dates = sorted(set.intersection(*date_sets))[-30:]
@@ -141,19 +222,44 @@ def build_payload(daily, minutes, now):
     return {
         "generated_at": now.astimezone(SHANGHAI).isoformat(timespec="seconds"),
         "unit": "手",
-        "source": "东方财富指数行情：上证A股指数、深证A指、科创综指",
+        "source": source,
         "daily": daily_rows,
         "intraday": intraday,
     }
 
 
-def fetch(now):
+def fetch_eastmoney(now):
     start = (now.astimezone(SHANGHAI).date() - timedelta(days=150)).strftime("%Y%m%d")
     daily, minutes = {}, {}
     for key, (_, secid) in MARKETS.items():
         daily[key] = parse_daily(get_data("kline", secid, klt=101, fqt=0, beg=start, end="20500101"))
         minutes[key] = parse_minutes(get_data("trends2", secid, ndays=1, iscr=0))
-    return build_payload(daily, minutes, datetime.now(SHANGHAI))
+    return daily, minutes
+
+
+def fetch_tencent(_now):
+    daily, minutes = {}, {}
+    for key, (_, secid) in MARKETS.items():
+        market, code = secid.split(".")
+        symbol = ("sh" if market == "1" else "sz") + code
+        daily[key] = parse_tencent_daily(get_tencent_data("day", symbol))
+        minutes[key] = parse_tencent_minutes(get_tencent_data("minute", symbol))
+    return daily, minutes
+
+
+def fetch(now):
+    errors = []
+    for name, provider in (("腾讯财经", fetch_tencent), ("东方财富", fetch_eastmoney)):
+        try:
+            print(f"正在获取{name}行情…", flush=True)
+            daily, minutes = provider(now)
+            payload = build_payload(daily, minutes, datetime.now(SHANGHAI), f"{name}指数行情：上证A股指数、深证A指、科创综指")
+            print(f"行情来源：{name}", flush=True)
+            return payload
+        except (RuntimeError, ValueError, KeyError, TypeError) as error:
+            errors.append(f"{name}: {error}")
+            print(f"{name}不可用：{error}", file=sys.stderr, flush=True)
+    raise RuntimeError("所有行情源均不可用；" + "；".join(errors))
 
 
 def main():
