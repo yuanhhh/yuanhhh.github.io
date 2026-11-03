@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Yuanhui 的个人工具与笔记">
+  <meta name="description" content="Yuanhui 的个人工具">
   <meta name="theme-color" content="#f6f5ef">
   <title>Yuanhui · 个人空间</title>
   <style>
@@ -11,9 +11,7 @@
       color-scheme: light;
       --paper: #f6f5ef;
       --ink: #1d2924;
-      --muted: #78827a;
       --line: #dedfd6;
-      --green: #2e5b46;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
@@ -26,7 +24,7 @@
     }
     a { color: inherit; text-decoration: none; }
     a:focus-visible { outline: 3px solid #d47949; outline-offset: 5px; }
-    .wrap { width: min(1120px, calc(100% - 64px)); margin: 0 auto; }
+    .wrap { display: flex; width: min(1120px, calc(100% - 64px)); min-height: 100vh; flex-direction: column; margin: 0 auto; }
     .header {
       display: flex;
       align-items: center;
@@ -49,29 +47,16 @@
       font-weight: 400;
     }
     .nav { display: flex; align-items: center; gap: 32px; color: #626d65; font-size: 13px; font-weight: 600; }
-    .nav a:hover, .notes a:hover { color: #d06e3f; }
-    .hero {
-      position: relative;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 360px;
-      align-items: center;
-      min-height: 365px;
-      padding: 48px 0 56px;
-    }
-    .eyebrow, .section-kicker, .card-number, .card-type, .note-label {
+    .nav a:hover { color: #d06e3f; }
+    main { display: flex; flex: 1; flex-direction: column; justify-content: center; padding: 70px 0; }
+    .section-kicker, .card-number, .card-type {
       font-size: 11px;
       font-weight: 700;
       letter-spacing: .14em;
       text-transform: uppercase;
     }
-    .eyebrow { display: flex; align-items: center; gap: 10px; margin: 0 0 23px; color: var(--green); }
-    .eyebrow::before { width: 23px; height: 1px; background: currentColor; content: ""; }
-    h1 { margin: 0; font-size: clamp(42px, 6.5vw, 76px); font-weight: 650; letter-spacing: -.065em; line-height: 1.22; }
-    h1 span { color: #799081; }
-    .hero-caption { margin: 22px 0 0; color: var(--muted); font-size: 14px; letter-spacing: .04em; }
-    .hero-art { width: 100%; max-width: 340px; justify-self: end; }
     .section-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 18px; }
-    .section-heading h2 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.04em; }
+    .section-heading h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.04em; }
     .section-kicker { color: #929b91; }
     .tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
     .tool {
@@ -91,39 +76,20 @@
     .card-top, .card-bottom { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; }
     .card-number { opacity: .58; }
     .card-type { opacity: .7; }
-    .tool h3 { position: relative; z-index: 1; margin: 0 0 8px; font-size: clamp(22px, 2.3vw, 28px); font-weight: 650; letter-spacing: -.05em; }
+    .tool h2 { position: relative; z-index: 1; margin: 0 0 8px; font-size: clamp(22px, 2.3vw, 28px); font-weight: 650; letter-spacing: -.05em; }
     .tool p { position: relative; z-index: 1; margin: 0; font-size: 13px; opacity: .7; }
     .arrow { display: grid; width: 38px; height: 38px; flex: none; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: 19px; line-height: 1; transition: transform .2s ease; }
     .tool:hover .arrow { transform: rotate(45deg); }
     .card-art { position: absolute; top: 44px; right: 6%; width: 43%; height: 135px; opacity: .8; }
-    .notes {
-      display: flex;
-      align-items: center;
-      gap: 28px;
-      margin-top: 40px;
-      padding: 25px 0;
-      border-top: 1px solid var(--line);
-      color: #626d65;
-      font-size: 13px;
-    }
-    .note-label { margin-right: auto; color: #929b91; }
-    footer { display: flex; justify-content: space-between; padding: 18px 0 36px; color: #a0a69e; font-size: 11px; letter-spacing: .04em; }
+    footer { display: flex; justify-content: space-between; padding: 25px 0 36px; border-top: 1px solid var(--line); color: #a0a69e; font-size: 11px; letter-spacing: .04em; }
     @media (max-width: 700px) {
       .wrap { width: calc(100% - 40px); }
       .header { min-height: 76px; }
       .nav { gap: 22px; }
-      .hero { grid-template-columns: minmax(0, 1fr) 135px; min-height: 270px; padding: 45px 0 48px; }
-      .hero-art { width: 145px; margin-right: -10px; }
-      h1 { font-size: clamp(36px, 8vw, 54px); }
+      main { padding: 52px 0; }
       .tools { grid-template-columns: 1fr; }
       .tool { min-height: 245px; }
       .card-art { height: 115px; }
-      .notes { gap: 22px; }
-    }
-    @media (max-width: 390px) {
-      .hero { grid-template-columns: minmax(0, 1fr) 90px; }
-      .hero-art { width: 115px; }
-      .notes { gap: 15px; }
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
@@ -135,33 +101,12 @@
   <div class="wrap">
     <header class="header">
       <a class="brand" href="/" aria-label="Yuanhui 首页"><span class="brand-mark" aria-hidden="true">y</span><span>yuanhui.</span></a>
-      <nav class="nav" aria-label="主页导航"><a href="#tools">工具</a><a href="#notes">笔记</a></nav>
+      <nav class="nav" aria-label="主页导航"><a href="#tools">工具</a></nav>
     </header>
 
     <main>
-      <section class="hero" aria-labelledby="hero-title">
-        <div>
-          <p class="eyebrow">Yuanhui's space</p>
-          <h1 id="hero-title">留一点时间，<br><span>给好奇。</span></h1>
-          <p class="hero-caption">一些工具，一些记录。</p>
-        </div>
-        <svg class="hero-art" viewBox="0 0 340 300" fill="none" aria-hidden="true">
-          <circle cx="171" cy="150" r="116" stroke="#d8ddd1"/>
-          <circle cx="171" cy="150" r="86" stroke="#d8ddd1"/>
-          <circle cx="171" cy="150" r="55" stroke="#d8ddd1"/>
-          <path d="M171 19v262M40 150h262" stroke="#d8ddd1"/>
-          <path d="M64 196c38-3 52-67 88-56 34 10 39 48 68 24 19-16 31-52 60-56" stroke="#47745a" stroke-width="2" stroke-linecap="round"/>
-          <circle cx="152" cy="140" r="5" fill="#47745a"/>
-          <circle cx="220" cy="164" r="5" fill="#d68151"/>
-          <circle cx="280" cy="108" r="5" fill="#47745a"/>
-          <circle cx="88" cy="69" r="8" fill="#e3ae83"/>
-          <path d="M261 55v20M251 65h20" stroke="#9eafa0" stroke-width="1.5"/>
-          <path d="M58 245h23M69.5 233.5v23" stroke="#c6d0c3" stroke-width="1.5"/>
-        </svg>
-      </section>
-
       <section id="tools" aria-labelledby="tools-title">
-        <div class="section-heading"><h2 id="tools-title">探索工具</h2><span class="section-kicker">Selected tools / 02</span></div>
+        <div class="section-heading"><h1 id="tools-title">探索工具</h1><span class="section-kicker">Selected tools / 02</span></div>
         <div class="tools">
           <a class="tool tool-dark" href="/stock-similarity/">
             <div class="card-top"><span class="card-number">01 / 02</span><span class="card-type">Pattern</span></div>
@@ -171,7 +116,7 @@
               <path d="M0 112l25-10 22 2 27-27 24 10 26-22 24 13 24-15 25 7 23-17" stroke="#c7dfbe" stroke-opacity=".4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 6"/>
               <circle cx="220" cy="19" r="4" fill="#e9b883"/>
             </svg>
-            <div class="card-bottom"><div><h3>股票走势相似度</h3><p>发现相似的走势</p></div><span class="arrow" aria-hidden="true">↗</span></div>
+            <div class="card-bottom"><div><h2>股票走势相似度</h2><p>发现相似的走势</p></div><span class="arrow" aria-hidden="true">↗</span></div>
           </a>
           <a class="tool tool-light" href="/three-down/">
             <div class="card-top"><span class="card-number">02 / 02</span><span class="card-type">Screener</span></div>
@@ -185,19 +130,12 @@
               <rect x="150" y="74" width="14" height="24" rx="2" fill="#c78258"/>
               <rect x="182" y="67" width="14" height="19" rx="2" fill="#c78258"/>
             </svg>
-            <div class="card-bottom"><div><h3>三连阴缩量选股</h3><p>寻找值得关注的形态</p></div><span class="arrow" aria-hidden="true">↗</span></div>
+            <div class="card-bottom"><div><h2>三连阴缩量选股</h2><p>寻找值得关注的形态</p></div><span class="arrow" aria-hidden="true">↗</span></div>
           </a>
         </div>
       </section>
-
-      <nav class="notes" id="notes" aria-label="笔记分类">
-        <span class="note-label">Notes / 笔记</span>
-        <a href="/leetcode/">算法</a>
-        <a href="/java/">Java</a>
-        <a href="/life/">生活</a>
-      </nav>
     </main>
-    <footer><span>© Yuanhui</span><span>Made for curiosity.</span></footer>
+    <footer><span>© Yuanhui</span></footer>
   </div>
 </body>
 </html>
