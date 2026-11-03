@@ -26,6 +26,16 @@ PERIODS = (
     ("13:00–14:00", "13:00", "14:00"),
     ("14:00–15:00", "14:00", "15:00"),
 )
+HALF_HOUR_PERIODS = (
+    ("09:30–10:00", "09:30", "10:00"),
+    ("10:00–10:30", "10:00", "10:30"),
+    ("10:30–11:00", "10:30", "11:00"),
+    ("11:00–11:30", "11:00", "11:30"),
+    ("13:00–13:30", "13:00", "13:30"),
+    ("13:30–14:00", "13:30", "14:00"),
+    ("14:00–14:30", "14:00", "14:30"),
+    ("14:30–15:00", "14:30", "15:00"),
+)
 API_ROOT = "https://push2his.eastmoney.com/api/qt/stock"
 TENCENT_ROOT = "https://web.ifzq.gtimg.cn/appstock/app"
 SOHU_ROOT = "https://q.stock.sohu.com/hisHq"
@@ -211,6 +221,18 @@ def expected_minutes(date, latest):
     return result
 
 
+def aggregate_periods(aligned, latest, periods):
+    result = []
+    for index, (label, start, end) in enumerate(periods):
+        stamps = [stamp for stamp in aligned["sh"] if (stamp[11:] >= start if index == 0 else stamp[11:] > start) and stamp[11:] <= end]
+        result.append({
+            "period": label,
+            "values": {key: sum(aligned[key][stamp] for stamp in stamps) for key in MARKETS} if stamps else None,
+            "partial": bool(stamps) and latest[11:] < end,
+        })
+    return result
+
+
 def build_payload(daily, minutes, now, source="东方财富指数行情：上证A股指数、深证A指、科创综指"):
     today = now.astimezone(SHANGHAI).date().isoformat()
     date_sets = [set(daily[key]) for key in MARKETS]
@@ -236,18 +258,12 @@ def build_payload(daily, minutes, now, source="东方财富指数行情：上证
             raise ValueError("三个市场的分时数据时间点不一致")
         if set(aligned["sh"]) != expected_minutes(today, latest):
             raise ValueError("当日分时数据缺少分钟记录，请稍后重试")
-        hourly = []
-        for index, (label, start, end) in enumerate(PERIODS):
-            stamps = [stamp for stamp in aligned["sh"] if (stamp[11:] >= start if index == 0 else stamp[11:] > start) and stamp[11:] <= end]
-            hourly.append({
-                "period": label,
-                "values": {key: sum(aligned[key][stamp] for stamp in stamps) for key in MARKETS} if stamps else None,
-                "partial": bool(stamps) and latest[11:] < end,
-            })
+        hourly = aggregate_periods(aligned, latest, PERIODS)
+        half_hourly = aggregate_periods(aligned, latest, HALF_HOUR_PERIODS)
         totals = {key: sum(points.values()) for key, points in aligned.items()}
         daily_rows[-1]["values"] = totals
         daily_rows[-1]["partial"] = latest[11:] < "15:00"
-        intraday = {"date": today, "as_of": latest, "hourly": hourly}
+        intraday = {"date": today, "as_of": latest, "hourly": hourly, "half_hourly": half_hourly}
     elif dates[-1] == today:
         # A today's K-line without minute data must not be presented as a complete refresh.
         raise ValueError("当日日线已更新，但分时数据暂不可用，请稍后重试")

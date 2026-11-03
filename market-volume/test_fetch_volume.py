@@ -46,6 +46,30 @@ class VolumeTests(unittest.TestCase):
         self.assertFalse(any(hour["partial"] for hour in payload["intraday"]["hourly"]))
         self.assertFalse(payload["daily"][-1]["partial"])
 
+    def test_half_hour_boundaries_reconcile_with_hourly_totals(self):
+        times = [("09:30", 1), ("10:00", 2), ("10:01", 3), ("10:30", 4),
+                 ("10:31", 5), ("11:00", 6), ("11:01", 7), ("11:30", 8),
+                 ("13:01", 9), ("13:30", 10), ("13:31", 11), ("14:00", 12),
+                 ("14:01", 13), ("14:30", 14), ("14:31", 15), ("15:00", 16)]
+        payload = build_payload(make_daily(), make_minutes(times), datetime(2026, 11, 3, 15, tzinfo=SHANGHAI))
+        half_hours = payload["intraday"]["half_hourly"]
+        self.assertEqual(len(half_hours), 8)
+        self.assertEqual([row["values"]["sh"] for row in half_hours], [3, 7, 11, 15, 19, 23, 27, 31])
+        for index, hour in enumerate(payload["intraday"]["hourly"]):
+            for key in MARKETS:
+                self.assertEqual(hour["values"][key], half_hours[index * 2]["values"][key] + half_hours[index * 2 + 1]["values"][key])
+        self.assertFalse(any(row["partial"] for row in half_hours))
+
+    def test_half_hour_in_progress_does_not_invent_future_values(self):
+        times = [("09:30", 5), ("10:00", 7), ("10:01", 11)]
+        payload = build_payload(make_daily(), make_minutes(times), datetime(2026, 11, 3, 10, 1, tzinfo=SHANGHAI))
+        periods = payload["intraday"]["half_hourly"]
+        self.assertEqual(periods[0]["values"]["sh"], 12)
+        self.assertFalse(periods[0]["partial"])
+        self.assertEqual(periods[1]["values"]["sh"], 11)
+        self.assertTrue(periods[1]["partial"])
+        self.assertTrue(all(row["values"] is None and not row["partial"] for row in periods[2:]))
+
     def test_non_trading_day_does_not_show_yesterday_as_today(self):
         minutes = {key: {"2026-11-02 15:00": 20} for key in MARKETS}
         payload = build_payload(make_daily("2026-11-02"), minutes, datetime(2026, 11, 3, 8, tzinfo=SHANGHAI))

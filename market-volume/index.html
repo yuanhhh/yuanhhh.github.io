@@ -39,6 +39,12 @@
     .section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
     h2 { margin: 0; font-size: 18px; letter-spacing: -.03em; }
     .subtle { color: var(--muted); font-size: 12px; }
+    .chart-controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-top: 18px; }
+    .control-group { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+    .control-label { margin-right: 3px; color: var(--muted); font-size: 12px; }
+    .option { min-height: 32px; padding: 5px 12px; border: 1px solid #e1e6dd; border-radius: 8px; color: #627068; background: #fff; font-size: 12px; font-weight: 600; }
+    .option:hover { border-color: #9eb4a3; }
+    .option[aria-pressed="true"] { border-color: #376b50; color: #254a39; background: #e9f1e8; }
     .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 19px 0 12px; }
     .filter { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 5px 11px; border: 1px solid #e1e6dd; border-radius: 999px; color: #627068; background: #fff; font-size: 12px; font-weight: 600; }
     .filter:hover { border-color: #9eb4a3; }
@@ -57,7 +63,9 @@
     .bars { display: flex; width: 100%; height: 200px; align-items: end; justify-content: center; gap: 2px; }
     .bar { position: relative; width: 5px; min-height: 2px; border-radius: 3px 3px 0 0; }
     .bar.zero { min-height: 0; }
-    .bar-value { position: absolute; bottom: calc(100% + 3px); left: 50%; color: #526158; font-size: 10px; line-height: 1; white-space: nowrap; transform: translateX(-50%); }
+    .chart.line-mode .bar { background: transparent; }
+    .trend-lines { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .bar-value { position: absolute; bottom: calc(100% + 5px); left: 50%; z-index: 2; color: #526158; font-size: 10px; line-height: 1; white-space: nowrap; transform: translateX(-50%); }
     .chart.single .group { width: 60px; }
     .chart.single .bar { width: 18px; }
     .axis-label { display: block; height: 42px; padding-top: 7px; color: #869087; font-size: 10px; text-align: center; white-space: nowrap; }
@@ -104,6 +112,7 @@
       </section>
       <section class="panel" aria-labelledby="daily-title">
         <div class="section-head"><h2 id="daily-title">近 30 个交易日</h2><span id="updated" class="subtle">单位：亿元</span></div>
+        <div class="chart-controls"><div class="control-group" role="group" aria-label="每日图表类型"><span class="control-label">图形</span><button type="button" class="option" data-view-chart="daily" data-view="bar" aria-pressed="true">柱状图</button><button type="button" class="option" data-view-chart="daily" data-view="line" aria-pressed="false">曲线图</button></div></div>
         <div class="legend" role="group" aria-label="每日图表显示系列">
           <button type="button" class="filter" data-chart="daily" data-series="all" aria-pressed="true">全部</button>
           <button type="button" class="filter" data-chart="daily" data-series="sh" aria-pressed="false"><i class="dot sh"></i>沪市 A 股</button>
@@ -121,17 +130,21 @@
       </section>
       <section class="panel" aria-labelledby="hourly-title">
         <div class="section-head"><h2 id="hourly-title">今日分时</h2><span id="as-of" class="subtle">单位：亿元</span></div>
+        <div class="chart-controls">
+          <div class="control-group" role="group" aria-label="分时统计间隔"><span class="control-label">间隔</span><button type="button" class="option" data-interval="hourly" aria-pressed="true">1小时</button><button type="button" class="option" data-interval="half_hourly" aria-pressed="false">半小时</button></div>
+          <div class="control-group" role="group" aria-label="分时图表类型"><span class="control-label">图形</span><button type="button" class="option" data-view-chart="hourly" data-view="bar" aria-pressed="true">柱状图</button><button type="button" class="option" data-view-chart="hourly" data-view="line" aria-pressed="false">曲线图</button></div>
+        </div>
         <div class="legend" role="group" aria-label="分时图表显示系列">
-          <button type="button" class="filter" data-chart="hourly" data-series="all" aria-pressed="true">全部</button>
+          <button type="button" class="filter" data-chart="hourly" data-series="all" aria-pressed="false">全部</button>
           <button type="button" class="filter" data-chart="hourly" data-series="sh" aria-pressed="false"><i class="dot sh"></i>沪市 A 股</button>
           <button type="button" class="filter" data-chart="hourly" data-series="sz" aria-pressed="false"><i class="dot sz"></i>深市 A 股</button>
           <button type="button" class="filter" data-chart="hourly" data-series="star" aria-pressed="false"><i class="dot star"></i>科创板</button>
-          <button type="button" class="filter" data-chart="hourly" data-series="sum" aria-pressed="false"><i class="dot sum"></i>沪深合计</button>
+          <button type="button" class="filter" data-chart="hourly" data-series="sum" aria-pressed="true"><i class="dot sum"></i>沪深合计</button>
         </div>
         <div id="hourly-empty" class="empty">更新后查看今日分时</div>
         <div id="hourly-content" hidden>
           <div class="plot"><div id="hourly-axis" class="y-axis" aria-hidden="true"></div><div class="chart-scroll"><div id="hourly-chart" class="chart hour-chart" role="img" aria-label="今日分时成交额柱状图，详细数值见下方表格"></div></div></div>
-          <p class="note">单位：亿元。选择单个系列可放大查看趋势和数值。北京时间，开盘集合竞价计入第一段；未满一小时显示实际成交额。</p>
+          <p class="note">单位：亿元。柱状图叠加趋势线；切换间隔或图形可查看不同时段。北京时间，开盘集合竞价计入第一段，未满时段显示实际成交额。</p>
           <p class="note">沪深合计包含科创板，不重复计算。</p>
           <details open><summary>查看分时数据（亿元）</summary><div class="table-scroll"><table><thead><tr><th>时段</th><th>沪市 A 股</th><th>深市 A 股</th><th>科创板</th><th>沪深合计</th></tr></thead><tbody id="hourly-table"></tbody></table></div></details>
         </div>
@@ -145,7 +158,10 @@
     const apiRoot = `https://api.github.com/repos/${OWNER}/${REPO}`;
     const markets = [["sh", "沪市 A 股"], ["sz", "深市 A 股"], ["star", "科创板"]];
     const series = [...markets, ["sum", "沪深合计"]];
-    const selected = { daily: "all", hourly: "all" };
+    const selected = { daily: "all", hourly: "sum" };
+    const view = { daily: "bar", hourly: "bar" };
+    const lineState = {};
+    let interval = "hourly";
     let currentPayload = null;
     const $ = id => document.getElementById(id);
     const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[char]));
@@ -177,9 +193,10 @@
 
     function validate(payload, requestId) {
       const validValues = values => values && markets.every(([key]) => Number.isSafeInteger(values[key]) && values[key] >= 0);
+      const validPeriods = (rows, length) => Array.isArray(rows) && rows.length === length && rows.every(row => row && typeof row.period === "string" && (row.values === null || validValues(row.values)));
       if (!payload || payload.request_id !== requestId || payload.metric !== "turnover" || payload.unit !== "分" || !Array.isArray(payload.daily) || payload.daily.length !== 30 ||
           payload.daily.some(row => !/^\d{4}-\d{2}-\d{2}$/.test(row.date) || !validValues(row.values)) ||
-          (payload.intraday && (!Array.isArray(payload.intraday.hourly) || payload.intraday.hourly.length !== 4 || payload.intraday.hourly.some(row => row.values !== null && !validValues(row.values))))) {
+          (payload.intraday && (!validPeriods(payload.intraday.hourly, 4) || !validPeriods(payload.intraday.half_hourly, 8)))) {
         throw new Error("返回数据不完整，请重试。");
       }
     }
@@ -188,25 +205,81 @@
       return key === "sum" ? values.sh + values.sz : values[key];
     }
 
-    function renderChart(element, axis, rows, label, selection) {
+    function trendPath(points) {
+      let connected = false;
+      return points.map(point => {
+        if (!point) { connected = false; return ""; }
+        const command = connected ? "L" : "M";
+        connected = true;
+        return `${command}${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+      }).filter(Boolean).join(" ");
+    }
+
+    function drawTrendLines(element) {
+      const state = lineState[element.id];
+      if (!state || typeof element.querySelectorAll !== "function" || !element.ownerDocument) return;
+      const old = element.querySelector(".trend-lines");
+      if (old) old.remove();
+      if (!state.enabled) return;
+      const rect = element.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const groups = element.querySelectorAll(".group");
+      const ns = "http://www.w3.org/2000/svg";
+      const svg = element.ownerDocument.createElementNS(ns, "svg");
+      svg.setAttribute("class", "trend-lines");
+      svg.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
+      svg.setAttribute("aria-hidden", "true");
+      const colors = { sh: "#254a39", sz: "#728d76", star: "#ad613c", sum: "#334e83" };
+      for (const [key] of state.visible) {
+        const points = state.rows.map((row, index) => {
+          if (!row.values || !groups[index]) return null;
+          const bar = groups[index].querySelector(`.bar[data-series="${key}"]`);
+          const bars = groups[index].querySelector(".bars");
+          if (!bar || !bars) return null;
+          const barRect = bar.getBoundingClientRect(), barsRect = bars.getBoundingClientRect();
+          return { x: barRect.left + barRect.width / 2 - rect.left, y: barsRect.bottom - rect.top - seriesValue(row.values, key) / state.maximum * barsRect.height, partial: row.partial };
+        });
+        const path = element.ownerDocument.createElementNS(ns, "path");
+        path.setAttribute("d", trendPath(points));
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", colors[key]);
+        path.setAttribute("stroke-width", "2");
+        path.setAttribute("stroke-linejoin", "round");
+        path.setAttribute("stroke-linecap", "round");
+        svg.appendChild(path);
+        points.filter(Boolean).forEach(point => {
+          const circle = element.ownerDocument.createElementNS(ns, "circle");
+          circle.setAttribute("cx", point.x); circle.setAttribute("cy", point.y);
+          circle.setAttribute("r", "3"); circle.setAttribute("fill", point.partial ? "#fffefa" : colors[key]);
+          circle.setAttribute("stroke", colors[key]); circle.setAttribute("stroke-width", "1.5");
+          svg.appendChild(circle);
+        });
+      }
+      element.appendChild(svg);
+    }
+
+    function renderChart(element, axis, rows, label, selection, mode = "bar") {
       const visible = selection === "all" ? series : series.filter(([key]) => key === selection);
       const highest = Math.max(0, ...rows.flatMap(row => row.values ? visible.map(([key]) => seriesValue(row.values, key)) : []));
       const step = highest ? Math.max(100000000, 10 ** Math.floor(Math.log10(highest / 4))) : 100000000;
       const maximum = Math.max(4 * step, Math.ceil(highest / (4 * step)) * 4 * step);
       axis.innerHTML = `<div>${[4, 3, 2, 1, 0].map((tick, index) => `<span style="top:${index * 25}%">${format(maximum * tick / 4)}</span>`).join("")}</div>`;
       element.classList.toggle("single", selection !== "all");
+      element.classList.toggle("line-mode", mode === "line");
       const description = selection === "all" ? "全部系列" : visible[0][1];
-      element.setAttribute("aria-label", `${element.id === "daily-chart" ? "最近 30 个交易日" : "今日分时"}成交额，${description}，单位亿元，详细数值见下方表格`);
+      element.setAttribute("aria-label", `${element.id === "daily-chart" ? "最近 30 个交易日" : "今日分时"}成交额${mode === "line" ? "曲线图" : "柱状图"}，${description}，单位亿元，详细数值见下方表格`);
       element.innerHTML = rows.map(row => {
         const name = label(row);
         const bars = row.values ? visible.map(([key, title]) => {
           const value = seriesValue(row.values, key);
           const valueLabel = selection === "all" ? "" : `<span class="bar-value">${format(value)}</span>`;
-          return `<span class="bar ${key}${value === 0 ? " zero" : ""}" style="height:${value / maximum * 100}%" title="${escapeHtml(row.date || name)} · ${title}：${format(value)} 亿元">${valueLabel}</span>`;
+          return `<span class="bar ${key}${value === 0 ? " zero" : ""}" data-series="${key}" style="height:${value / maximum * 100}%" title="${escapeHtml(row.date || name)} · ${title}：${format(value)} 亿元">${valueLabel}</span>`;
         }).join("") : "";
         const suffix = row.partial ? '<br><span class="partial">进行中</span>' : "";
         return `<div class="group"><div class="bars">${bars}</div><span class="axis-label">${escapeHtml(name)}${suffix}</span></div>`;
       }).join("");
+      lineState[element.id] = { rows, visible, maximum, enabled: mode === "line" || element.id === "hourly-chart" };
+      drawTrendLines(element);
     }
 
     function renderTable(element, rows, label) {
@@ -221,14 +294,14 @@
       currentPayload = payload;
       $("source").textContent = `来源：${typeof payload.source === "string" ? payload.source : "指数行情"}`;
       $("daily-empty").hidden = true; $("daily-content").hidden = false;
-      renderChart($("daily-chart"), $("daily-axis"), payload.daily, row => row.date.slice(5), selected.daily);
+      renderChart($("daily-chart"), $("daily-axis"), payload.daily, row => row.date.slice(5), selected.daily, view.daily);
       renderTable($("daily-table"), [...payload.daily].reverse(), row => row.date);
       $("daily-chart").parentElement.scrollLeft = $("daily-chart").parentElement.scrollWidth;
       $("updated").textContent = `单位：亿元 · 更新：${payload.generated_at.replace("T", " ").slice(0, 19)}（北京）`;
       if (payload.intraday) {
         $("hourly-empty").hidden = true; $("hourly-content").hidden = false;
-        renderChart($("hourly-chart"), $("hourly-axis"), payload.intraday.hourly, row => row.period, selected.hourly);
-        renderTable($("hourly-table"), payload.intraday.hourly, row => row.period);
+        renderChart($("hourly-chart"), $("hourly-axis"), payload.intraday[interval], row => row.period, selected.hourly, view.hourly);
+        renderTable($("hourly-table"), payload.intraday[interval], row => row.period);
         $("as-of").textContent = `单位：亿元 · 截至 ${payload.intraday.as_of}（北京）`;
       } else {
         $("as-of").textContent = "单位：亿元";
@@ -237,20 +310,40 @@
       }
     }
 
-    document.querySelectorAll(".filter").forEach(button => {
-      button.addEventListener("click", () => {
-        const { chart, series: selection } = button.dataset;
-        selected[chart] = selection;
-        document.querySelectorAll(`.filter[data-chart="${chart}"]`).forEach(item => item.setAttribute("aria-pressed", String(item === button)));
-        if (!currentPayload) return;
-        const rows = chart === "daily" ? currentPayload.daily : currentPayload.intraday?.hourly;
-        if (!rows) return;
-        const element = $(`${chart}-chart`), scroll = element.parentElement;
-        const oldRange = scroll.scrollWidth - scroll.clientWidth;
-        const progress = oldRange > 0 ? scroll.scrollLeft / oldRange : 1;
-        renderChart(element, $(`${chart}-axis`), rows, chart === "daily" ? row => row.date.slice(5) : row => row.period, selection);
-        scroll.scrollLeft = progress * (scroll.scrollWidth - scroll.clientWidth);
-      });
+    function redraw(chart) {
+      if (!currentPayload) return;
+      const rows = chart === "daily" ? currentPayload.daily : currentPayload.intraday?.[interval];
+      if (!rows) return;
+      const element = $(`${chart}-chart`), scroll = element.parentElement;
+      const oldRange = scroll.scrollWidth - scroll.clientWidth;
+      const progress = oldRange > 0 ? scroll.scrollLeft / oldRange : 1;
+      renderChart(element, $(`${chart}-axis`), rows, chart === "daily" ? row => row.date.slice(5) : row => row.period, selected[chart], view[chart]);
+      if (chart === "hourly") renderTable($("hourly-table"), rows, row => row.period);
+      scroll.scrollLeft = progress * (scroll.scrollWidth - scroll.clientWidth);
+    }
+
+    document.querySelectorAll(".filter").forEach(button => button.addEventListener("click", () => {
+      const { chart, series: selection } = button.dataset;
+      selected[chart] = selection;
+      document.querySelectorAll(`.filter[data-chart="${chart}"]`).forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+      redraw(chart);
+    }));
+
+    document.querySelectorAll("[data-view-chart]").forEach(button => button.addEventListener("click", () => {
+      const chart = button.dataset.viewChart;
+      view[chart] = button.dataset.view;
+      document.querySelectorAll(`[data-view-chart="${chart}"]`).forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+      redraw(chart);
+    }));
+
+    document.querySelectorAll("[data-interval]").forEach(button => button.addEventListener("click", () => {
+      interval = button.dataset.interval;
+      document.querySelectorAll("[data-interval]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+      redraw("hourly");
+    }));
+
+    if (typeof window !== "undefined") window.addEventListener("resize", () => {
+      ["daily", "hourly"].forEach(chart => drawTrendLines($(`${chart}-chart`)));
     });
 
     async function waitForResult(token, requestId) {

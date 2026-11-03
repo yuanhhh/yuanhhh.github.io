@@ -10,8 +10,8 @@ const document = {
   querySelectorAll: () => [],
 };
 const context = vm.createContext({ document, setTimeout, TextDecoder, Uint8Array });
-vm.runInContext(`${script}\nthis.chartFunctions = { format, seriesValue, renderTable, renderChart, validate };`, context);
-const { format, seriesValue, renderTable, renderChart, validate } = context.chartFunctions;
+vm.runInContext(`${script}\nthis.chartFunctions = { format, seriesValue, renderTable, renderChart, validate, trendPath, lineState };`, context);
+const { format, seriesValue, renderTable, renderChart, validate, trendPath, lineState } = context.chartFunctions;
 
 const values = { sh: 20000000000, sz: 30000000000, star: 10000000000 };
 
@@ -20,7 +20,7 @@ function chartElement(id) {
     id,
     innerHTML: "",
     attrs: {},
-    classList: { toggle(_name, enabled) { this.single = enabled; } },
+    classList: { toggle(name, enabled) { this[name] = enabled; } },
     setAttribute(name, value) { this.attrs[name] = value; },
   };
 }
@@ -50,6 +50,27 @@ test("分时沪深合计也只使用沪市和深市", () => {
   renderChart(chart, axis, rows, row => row.period, "sum");
   assert.match(chart.innerHTML, /class="bar-value">5\.00/);
   assert.match(chart.attrs["aria-label"], /沪深合计/);
+  assert.equal(lineState["hourly-chart"].enabled, true);
+});
+
+test("两张图可切换曲线模式，分时默认叠加趋势线", () => {
+  const rows = [{ date: "2026-11-03", values }];
+  const daily = chartElement("daily-chart"), hourly = chartElement("hourly-chart");
+  renderChart(daily, { innerHTML: "" }, rows, row => row.date, "sum", "bar");
+  assert.equal(lineState["daily-chart"].enabled, false);
+  renderChart(daily, { innerHTML: "" }, rows, row => row.date, "sum", "line");
+  assert.equal(daily.classList["line-mode"], true);
+  assert.equal(lineState["daily-chart"].enabled, true);
+  assert.match(daily.attrs["aria-label"], /曲线图/);
+  renderChart(hourly, { innerHTML: "" }, rows, row => row.date, "sum", "bar");
+  assert.equal(hourly.classList["line-mode"], false);
+  assert.equal(lineState["hourly-chart"].enabled, true);
+  renderChart(hourly, { innerHTML: "" }, rows, row => row.date, "sum", "line");
+  assert.equal(hourly.classList["line-mode"], true);
+});
+
+test("缺失时段会断开曲线，不会推测未发生的数据", () => {
+  assert.equal(trendPath([{ x: 1, y: 2 }, { x: 3, y: 4 }, null, { x: 5, y: 6 }]), "M1.00,2.00 L3.00,4.00 M5.00,6.00");
 });
 
 test("individual series rescales and shows values and partial status", () => {
@@ -77,9 +98,17 @@ test("rejects old volume payloads so they cannot be labelled as turnover", () =>
   assert.throws(() => validate({ ...payload, metric: "volume" }, "test"));
 });
 
+test("分时数据必须同时包含四个小时和八个半小时时段", () => {
+  const rows = Array.from({ length: 30 }, () => ({ date: "2026-11-03", values }));
+  const period = { period: "09:30–10:00", values };
+  const payload = { request_id: "test", daily: rows, unit: "分", metric: "turnover", intraday: { hourly: Array(4).fill(period), half_hourly: Array(8).fill(period) } };
+  assert.doesNotThrow(() => validate(payload, "test"));
+  assert.throws(() => validate({ ...payload, intraday: { hourly: Array(4).fill(period) } }, "test"));
+});
+
 test("zero is not rendered as a positive-height bar", () => {
   const chart = chartElement("hourly-chart"), axis = { innerHTML: "" };
   renderChart(chart, axis, [{ period: "09:30–10:30", values: { sh: 0, sz: 0, star: 0 } }], row => row.period, "sum");
-  assert.match(chart.innerHTML, /class="bar sum zero" style="height:0%"/);
+  assert.match(chart.innerHTML, /class="bar sum zero" data-series="sum" style="height:0%"/);
   assert.match(chart.innerHTML, /class="bar-value">0\.00/);
 });
