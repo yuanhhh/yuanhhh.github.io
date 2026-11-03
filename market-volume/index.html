@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A 股最近 30 个交易日及今日分时成交量">
+  <meta name="description" content="A 股最近 30 个交易日及今日分时成交额">
   <meta name="theme-color" content="#f6f5ef">
-  <title>A 股成交量 · Yuanhui</title>
+  <title>A 股成交额 · Yuanhui</title>
   <style>
     :root { color-scheme: light; --ink: #1d2924; --muted: #748078; --line: #e2e5dc; --green: #2e5b46; --paper: #f6f5ef; }
     * { box-sizing: border-box; }
@@ -28,8 +28,9 @@
     label { display: block; margin-bottom: 7px; color: #42584a; font-size: 12px; font-weight: 700; }
     input, button { min-height: 44px; border-radius: 9px; font: inherit; }
     input { width: 100%; padding: 0 13px; border: 1px solid #d5ddd3; color: var(--ink); background: #fbfcf8; }
-    button { padding: 0 22px; border: 0; color: #fff; background: var(--green); font-weight: 700; cursor: pointer; }
-    button:hover { background: #214937; }
+    button { cursor: pointer; }
+    .form button { padding: 0 22px; border: 0; color: #fff; background: var(--green); font-weight: 700; }
+    .form button:hover { background: #214937; }
     button:disabled { opacity: .6; cursor: wait; }
     .help, .status, .note { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
     .status { min-height: 1.6em; color: var(--green); }
@@ -38,20 +39,33 @@
     .section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
     h2 { margin: 0; font-size: 18px; letter-spacing: -.03em; }
     .subtle { color: var(--muted); font-size: 12px; }
-    .legend { display: flex; flex-wrap: wrap; gap: 18px; margin: 19px 0 12px; color: #5f6b62; font-size: 12px; }
-    .legend span { display: flex; align-items: center; gap: 6px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 19px 0 12px; }
+    .filter { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 5px 11px; border: 1px solid #e1e6dd; border-radius: 999px; color: #627068; background: #fff; font-size: 12px; font-weight: 600; }
+    .filter:hover { border-color: #9eb4a3; }
+    .filter[aria-pressed="true"] { border-color: #376b50; color: #254a39; background: #e9f1e8; }
     .dot { width: 9px; height: 9px; border-radius: 3px; }
-    .sh { background: #376b50; } .sz { background: #a5bba4; } .star { background: #db986f; }
+    .sh { background: #376b50; } .sz { background: #a5bba4; } .star { background: #db986f; } .sum { background: #526a9a; }
+    .plot { display: flex; min-width: 0; }
+    .y-axis { width: 55px; flex: none; padding: 18px 8px 0 0; color: #869087; font-size: 10px; text-align: right; }
+    .y-axis div { position: relative; height: 200px; }
+    .y-axis span { position: absolute; right: 0; transform: translateY(-50%); }
     .chart-scroll { overflow-x: auto; padding: 0 0 8px; }
-    .chart { display: flex; align-items: end; gap: 9px; min-width: max-content; min-height: 220px; padding: 18px 0 0; background: repeating-linear-gradient(to top, transparent 0, transparent 53px, #eef0e9 54px, transparent 55px); }
-    .group { display: flex; width: 37px; flex: none; flex-direction: column; align-items: center; justify-content: end; }
-    .bars { display: flex; width: 100%; height: 165px; align-items: end; justify-content: center; gap: 2px; }
-    .bar { width: 9px; min-height: 2px; border-radius: 3px 3px 0 0; }
+    .plot .chart-scroll { flex: 1; min-width: 0; }
+    .chart { position: relative; display: flex; height: 260px; min-width: max-content; align-items: end; padding: 18px 0 0; }
+    .chart::before { position: absolute; inset: 18px 0 42px; border-top: 1px solid #e6ebe3; background: repeating-linear-gradient(to top, #e6ebe3 0 1px, transparent 1px 25%); content: ""; pointer-events: none; }
+    .group { position: relative; display: flex; width: 34px; flex: none; flex-direction: column; align-items: center; justify-content: end; }
+    .bars { display: flex; width: 100%; height: 200px; align-items: end; justify-content: center; gap: 2px; }
+    .bar { position: relative; width: 5px; min-height: 2px; border-radius: 3px 3px 0 0; }
+    .bar.zero { min-height: 0; }
+    .bar-value { position: absolute; bottom: calc(100% + 3px); left: 50%; color: #526158; font-size: 10px; line-height: 1; white-space: nowrap; transform: translateX(-50%); }
+    .chart.single .group { width: 60px; }
+    .chart.single .bar { width: 18px; }
     .axis-label { display: block; height: 42px; padding-top: 7px; color: #869087; font-size: 10px; text-align: center; white-space: nowrap; }
-    .hour-chart { min-width: 430px; justify-content: space-around; }
-    .hour-chart .group { width: 78px; }
+    .hour-chart { min-width: 470px; justify-content: space-around; }
+    .hour-chart .group, .hour-chart.single .group { width: 100px; }
     .hour-chart .bars { gap: 5px; }
-    .hour-chart .bar { width: 15px; }
+    .hour-chart .bar { width: 13px; }
+    .hour-chart.single .bar { width: 24px; }
     .hour-chart .axis-label { height: 42px; text-align: center; }
     .partial { color: #c17a51; }
     .empty { display: grid; min-height: 160px; place-items: center; color: #98a39a; font-size: 13px; text-align: center; }
@@ -70,8 +84,8 @@
       main { padding: 34px 0 48px; }
       .panel { padding: 20px 16px; }
       .form { align-items: stretch; flex-direction: column; }
-      button { width: 100%; }
-      .legend { gap: 12px; }
+      .form button { width: 100%; }
+      .legend { gap: 6px; }
     }
   </style>
 </head>
@@ -79,7 +93,7 @@
   <div class="wrap">
     <header><a class="brand" href="/"><span class="mark" aria-hidden="true">y</span>yuanhui.</a><a class="back" href="/">← 返回主页</a></header>
     <main>
-      <div class="intro"><div><p class="eyebrow">MARKET VOLUME</p><h1>A 股成交量</h1><p>最近 30 个交易日与今日分时</p></div></div>
+      <div class="intro"><div><p class="eyebrow">MARKET TURNOVER</p><h1>A 股成交额</h1><p>最近 30 个交易日与今日分时</p></div></div>
       <section class="panel" aria-label="更新行情">
         <form id="form" class="form">
           <div class="field"><label for="token">GitHub Fine-grained Token</label><input id="token" type="password" autocomplete="off" placeholder="github_pat_..." required></div>
@@ -89,26 +103,40 @@
         <p id="status" class="status" role="status" aria-live="polite">填写 Token 后点击更新。</p>
       </section>
       <section class="panel" aria-labelledby="daily-title">
-        <div class="section-head"><h2 id="daily-title">近 30 个交易日</h2><span id="updated" class="subtle">单位：亿股</span></div>
-        <div class="legend" aria-label="图例"><span><i class="dot sh"></i>沪市 A 股</span><span><i class="dot sz"></i>深市 A 股</span><span><i class="dot star"></i>科创板</span></div>
-        <div id="daily-empty" class="empty">更新后查看成交量</div>
+        <div class="section-head"><h2 id="daily-title">近 30 个交易日</h2><span id="updated" class="subtle">单位：亿元</span></div>
+        <div class="legend" role="group" aria-label="每日图表显示系列">
+          <button type="button" class="filter" data-chart="daily" data-series="all" aria-pressed="true">全部</button>
+          <button type="button" class="filter" data-chart="daily" data-series="sh" aria-pressed="false"><i class="dot sh"></i>沪市 A 股</button>
+          <button type="button" class="filter" data-chart="daily" data-series="sz" aria-pressed="false"><i class="dot sz"></i>深市 A 股</button>
+          <button type="button" class="filter" data-chart="daily" data-series="star" aria-pressed="false"><i class="dot star"></i>科创板</button>
+          <button type="button" class="filter" data-chart="daily" data-series="sum" aria-pressed="false"><i class="dot sum"></i>三项相加</button>
+        </div>
+        <div id="daily-empty" class="empty">更新后查看成交额</div>
         <div id="daily-content" hidden>
-          <div class="chart-scroll"><div id="daily-chart" class="chart" role="img" aria-label="最近 30 个交易日成交量柱状图，详细数值见下方表格"></div></div>
-          <p class="note">当日数据为截至最新分时的快照。科创板包含在沪市中，不重复计入沪深合计。图表可横向滑动。</p>
-          <details><summary>查看每日数据</summary><div class="table-scroll"><table><thead><tr><th>交易日</th><th>沪市 A 股</th><th>深市 A 股</th><th>科创板</th><th>沪深合计</th></tr></thead><tbody id="daily-table"></tbody></table></div></details>
+          <div class="plot"><div id="daily-axis" class="y-axis" aria-hidden="true"></div><div class="chart-scroll"><div id="daily-chart" class="chart" role="img" aria-label="最近 30 个交易日成交额柱状图，详细数值见下方表格"></div></div></div>
+          <p class="note">单位：亿元。选择单个系列可放大查看趋势和数值，图表可横向滑动。当日为截至最新分时的快照。</p>
+          <p class="note">三项相加 = 沪市 + 深市 + 科创板；科创板已包含在沪市中，因此该数值重复计算科创板，不等于沪深合计。</p>
+          <details><summary>查看每日数据（亿元）</summary><div class="table-scroll"><table><thead><tr><th>交易日</th><th>沪市 A 股</th><th>深市 A 股</th><th>科创板</th><th>三项相加（重复）</th><th>沪深合计</th></tr></thead><tbody id="daily-table"></tbody></table></div></details>
         </div>
       </section>
       <section class="panel" aria-labelledby="hourly-title">
-        <div class="section-head"><h2 id="hourly-title">今日分时</h2><span id="as-of" class="subtle">单位：亿股</span></div>
-        <div class="legend" aria-label="图例"><span><i class="dot sh"></i>沪市 A 股</span><span><i class="dot sz"></i>深市 A 股</span><span><i class="dot star"></i>科创板</span></div>
+        <div class="section-head"><h2 id="hourly-title">今日分时</h2><span id="as-of" class="subtle">单位：亿元</span></div>
+        <div class="legend" role="group" aria-label="分时图表显示系列">
+          <button type="button" class="filter" data-chart="hourly" data-series="all" aria-pressed="true">全部</button>
+          <button type="button" class="filter" data-chart="hourly" data-series="sh" aria-pressed="false"><i class="dot sh"></i>沪市 A 股</button>
+          <button type="button" class="filter" data-chart="hourly" data-series="sz" aria-pressed="false"><i class="dot sz"></i>深市 A 股</button>
+          <button type="button" class="filter" data-chart="hourly" data-series="star" aria-pressed="false"><i class="dot star"></i>科创板</button>
+          <button type="button" class="filter" data-chart="hourly" data-series="sum" aria-pressed="false"><i class="dot sum"></i>三项相加</button>
+        </div>
         <div id="hourly-empty" class="empty">更新后查看今日分时</div>
         <div id="hourly-content" hidden>
-          <div class="chart-scroll"><div id="hourly-chart" class="chart hour-chart" role="img" aria-label="今日分时成交量柱状图，详细数值见下方表格"></div></div>
-          <p class="note">北京时间；开盘集合竞价计入第一段。未满一小时显示截至最新分时的实际成交量。</p>
-          <details><summary>查看分时数据</summary><div class="table-scroll"><table><thead><tr><th>时段</th><th>沪市 A 股</th><th>深市 A 股</th><th>科创板</th><th>沪深合计</th></tr></thead><tbody id="hourly-table"></tbody></table></div></details>
+          <div class="plot"><div id="hourly-axis" class="y-axis" aria-hidden="true"></div><div class="chart-scroll"><div id="hourly-chart" class="chart hour-chart" role="img" aria-label="今日分时成交额柱状图，详细数值见下方表格"></div></div></div>
+          <p class="note">单位：亿元。选择单个系列可放大查看趋势和数值。北京时间，开盘集合竞价计入第一段；未满一小时显示实际成交额。</p>
+          <p class="note">三项相加包含重复计算的科创板，不等于沪深合计。</p>
+          <details open><summary>查看分时数据（亿元）</summary><div class="table-scroll"><table><thead><tr><th>时段</th><th>沪市 A 股</th><th>深市 A 股</th><th>科创板</th><th>三项相加（重复）</th><th>沪深合计</th></tr></thead><tbody id="hourly-table"></tbody></table></div></details>
         </div>
       </section>
-      <p class="note"><span id="source">来源：腾讯财经或东方财富指数行情（上证 A 股指数、深证 A 指、科创综指）</span>；科创综指按数据源口径展示，并非保证覆盖全部科创板股票。行情可能延迟，仅供参考。</p>
+      <p class="note"><span id="source">来源：搜狐历史、腾讯财经分时或东方财富指数行情（上证 A 股指数、深证 A 指、科创综指）</span>；科创综指按数据源口径展示，并非保证覆盖全部科创板股票。行情可能延迟，仅供参考。</p>
     </main>
     <footer>© Yuanhui</footer>
   </div>
@@ -116,9 +144,12 @@
     const OWNER = "yuanhhh", REPO = "yuanhhh.github.io", BRANCH = "master", WORKFLOW = "market-volume.yml";
     const apiRoot = `https://api.github.com/repos/${OWNER}/${REPO}`;
     const markets = [["sh", "沪市 A 股"], ["sz", "深市 A 股"], ["star", "科创板"]];
+    const series = [...markets, ["sum", "三项相加（重复计算科创板）"]];
+    const selected = { daily: "all", hourly: "all" };
+    let currentPayload = null;
     const $ = id => document.getElementById(id);
     const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[char]));
-    const format = value => (value / 1000000).toFixed(2); // 1 手 = 100 股; 100 万手 = 1 亿股.
+    const format = value => (value / 10000000000).toFixed(2); // 1 亿元 = 100 亿分.
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     async function api(path, token, options = {}) {
@@ -146,20 +177,32 @@
 
     function validate(payload, requestId) {
       const validValues = values => values && markets.every(([key]) => Number.isSafeInteger(values[key]) && values[key] >= 0);
-      if (!payload || payload.request_id !== requestId || !Array.isArray(payload.daily) || payload.daily.length !== 30 ||
+      if (!payload || payload.request_id !== requestId || payload.metric !== "turnover" || payload.unit !== "分" || !Array.isArray(payload.daily) || payload.daily.length !== 30 ||
           payload.daily.some(row => !/^\d{4}-\d{2}-\d{2}$/.test(row.date) || !validValues(row.values)) ||
           (payload.intraday && (!Array.isArray(payload.intraday.hourly) || payload.intraday.hourly.length !== 4 || payload.intraday.hourly.some(row => row.values !== null && !validValues(row.values))))) {
         throw new Error("返回数据不完整，请重试。");
       }
     }
 
-    function renderChart(element, rows, label) {
-      const maximum = Math.max(1, ...rows.flatMap(row => row.values ? markets.map(([key]) => row.values[key]) : []));
+    function seriesValue(values, key) {
+      return key === "sum" ? values.sh + values.sz + values.star : values[key];
+    }
+
+    function renderChart(element, axis, rows, label, selection) {
+      const visible = selection === "all" ? series : series.filter(([key]) => key === selection);
+      const highest = Math.max(0, ...rows.flatMap(row => row.values ? visible.map(([key]) => seriesValue(row.values, key)) : []));
+      const step = highest ? Math.max(100000000, 10 ** Math.floor(Math.log10(highest / 4))) : 100000000;
+      const maximum = Math.max(4 * step, Math.ceil(highest / (4 * step)) * 4 * step);
+      axis.innerHTML = `<div>${[4, 3, 2, 1, 0].map((tick, index) => `<span style="top:${index * 25}%">${format(maximum * tick / 4)}</span>`).join("")}</div>`;
+      element.classList.toggle("single", selection !== "all");
+      const description = selection === "all" ? "全部系列" : visible[0][1];
+      element.setAttribute("aria-label", `${element.id === "daily-chart" ? "最近 30 个交易日" : "今日分时"}成交额，${description}，单位亿元，详细数值见下方表格`);
       element.innerHTML = rows.map(row => {
         const name = label(row);
-        const bars = row.values ? markets.map(([key, title]) => {
-          const value = row.values[key];
-          return `<span class="bar ${key}" style="height:${Math.max(0, value / maximum * 100)}%" title="${escapeHtml(name)} · ${title}：${format(value)} 亿股"></span>`;
+        const bars = row.values ? visible.map(([key, title]) => {
+          const value = seriesValue(row.values, key);
+          const valueLabel = selection === "all" ? "" : `<span class="bar-value">${format(value)}</span>`;
+          return `<span class="bar ${key}${value === 0 ? " zero" : ""}" style="height:${value / maximum * 100}%" title="${escapeHtml(row.date || name)} · ${title}：${format(value)} 亿元">${valueLabel}</span>`;
         }).join("") : "";
         const suffix = row.partial ? '<br><span class="partial">进行中</span>' : "";
         return `<div class="group"><div class="bars">${bars}</div><span class="axis-label">${escapeHtml(name)}${suffix}</span></div>`;
@@ -169,29 +212,46 @@
     function renderTable(element, rows, label) {
       element.innerHTML = rows.map(row => {
         const values = row.values;
-        const cells = values ? [...markets.map(([key]) => format(values[key])), format(values.sh + values.sz)] : ["—", "—", "—", "—"];
+        const cells = values ? [...markets.map(([key]) => format(values[key])), format(seriesValue(values, "sum")), format(values.sh + values.sz)] : ["—", "—", "—", "—", "—"];
         return `<tr><td>${escapeHtml(label(row))}${row.partial ? "（进行中）" : ""}</td>${cells.map(value => `<td>${value}</td>`).join("")}</tr>`;
       }).join("");
     }
 
     function render(payload) {
+      currentPayload = payload;
       $("source").textContent = `来源：${typeof payload.source === "string" ? payload.source : "指数行情"}`;
-      renderChart($("daily-chart"), payload.daily, row => row.date.slice(5));
-      renderTable($("daily-table"), [...payload.daily].reverse(), row => row.date);
       $("daily-empty").hidden = true; $("daily-content").hidden = false;
+      renderChart($("daily-chart"), $("daily-axis"), payload.daily, row => row.date.slice(5), selected.daily);
+      renderTable($("daily-table"), [...payload.daily].reverse(), row => row.date);
       $("daily-chart").parentElement.scrollLeft = $("daily-chart").parentElement.scrollWidth;
-      $("updated").textContent = `单位：亿股 · 更新：${payload.generated_at.replace("T", " ").slice(0, 19)}（北京）`;
+      $("updated").textContent = `单位：亿元 · 更新：${payload.generated_at.replace("T", " ").slice(0, 19)}（北京）`;
       if (payload.intraday) {
-        renderChart($("hourly-chart"), payload.intraday.hourly, row => row.period);
-        renderTable($("hourly-table"), payload.intraday.hourly, row => row.period);
-        $("as-of").textContent = `单位：亿股 · 截至 ${payload.intraday.as_of}（北京）`;
         $("hourly-empty").hidden = true; $("hourly-content").hidden = false;
+        renderChart($("hourly-chart"), $("hourly-axis"), payload.intraday.hourly, row => row.period, selected.hourly);
+        renderTable($("hourly-table"), payload.intraday.hourly, row => row.period);
+        $("as-of").textContent = `单位：亿元 · 截至 ${payload.intraday.as_of}（北京）`;
       } else {
-        $("as-of").textContent = "单位：亿股";
+        $("as-of").textContent = "单位：亿元";
         $("hourly-empty").textContent = "今日暂无分时数据（未开盘或非交易日）。";
         $("hourly-empty").hidden = false; $("hourly-content").hidden = true;
       }
     }
+
+    document.querySelectorAll(".filter").forEach(button => {
+      button.addEventListener("click", () => {
+        const { chart, series: selection } = button.dataset;
+        selected[chart] = selection;
+        document.querySelectorAll(`.filter[data-chart="${chart}"]`).forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+        if (!currentPayload) return;
+        const rows = chart === "daily" ? currentPayload.daily : currentPayload.intraday?.hourly;
+        if (!rows) return;
+        const element = $(`${chart}-chart`), scroll = element.parentElement;
+        const oldRange = scroll.scrollWidth - scroll.clientWidth;
+        const progress = oldRange > 0 ? scroll.scrollLeft / oldRange : 1;
+        renderChart(element, $(`${chart}-axis`), rows, chart === "daily" ? row => row.date.slice(5) : row => row.period, selection);
+        scroll.scrollLeft = progress * (scroll.scrollWidth - scroll.clientWidth);
+      });
+    });
 
     async function waitForResult(token, requestId) {
       let runId = null;

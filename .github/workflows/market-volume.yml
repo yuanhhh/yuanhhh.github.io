@@ -1,4 +1,4 @@
-name: Market Volume
+name: Market Turnover
 run-name: 行情查询 / ${{ inputs.request_id }}
 
 on:
@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Fetch market volumes
+      - name: Fetch market turnover
         env:
           REQUEST_ID: ${{ inputs.request_id }}
         run: |
@@ -38,7 +38,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "market-volume/results/$REQUEST_ID.json"
-          git commit -m "market volume result $REQUEST_ID"
+          git commit -m "market turnover result $REQUEST_ID"
           for attempt in 1 2 3; do
             git pull --rebase origin master
             if git push origin HEAD:master; then exit 0; fi

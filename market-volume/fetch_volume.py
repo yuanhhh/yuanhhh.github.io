@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch index volumes and group today's minute data by trading hour."""
+"""Fetch index turnover and group today's minute data by trading hour."""
 
 import argparse
 import json
@@ -8,6 +8,7 @@ import re
 import sys
 import time
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -27,15 +28,16 @@ PERIODS = (
 )
 API_ROOT = "https://push2his.eastmoney.com/api/qt/stock"
 TENCENT_ROOT = "https://web.ifzq.gtimg.cn/appstock/app"
+SOHU_ROOT = "https://q.stock.sohu.com/hisHq"
 FIELDS = {"fields1": "f1,f2,f3,f4,f5,f6", "fields2": "f51,f52,f53,f54,f55,f56,f57", "ut": "7eea3edcaed734bea9cbfc24409ed989"}
 
 
-def get_json(url, label, referer):
+def get_json(url, label, referer, encoding="utf-8"):
     for attempt in range(3):
         try:
             request = Request(url, headers={"User-Agent": "Mozilla/5.0", "Referer": referer})
             with urlopen(request, timeout=20) as response:
-                return json.load(response)
+                return json.loads(response.read().decode(encoding))
         except (OSError, ValueError, KeyError) as error:
             if attempt == 2:
                 raise RuntimeError(f"无法获取 {label}: {error}") from error
@@ -68,18 +70,25 @@ def get_tencent_data(kind, symbol):
     return data
 
 
-def tencent_volume(value):
-    value = str(value)
-    if not re.fullmatch(r"\d+(?:\.0+)?", value):
-        raise ValueError("腾讯成交量无效")
-    return int(value.split(".")[0])  # Both index endpoints report hands.
+def amount_fen(value, multiplier=100):
+    """Convert an upstream decimal amount to integer fen without float rounding."""
+    text = str(value)
+    if not re.fullmatch(r"\d+(?:\.\d+)?", text):
+        raise ValueError("成交额无效")
+    try:
+        amount = Decimal(text) * multiplier
+    except InvalidOperation as error:
+        raise ValueError("成交额无效") from error
+    if amount != amount.to_integral_value():
+        raise ValueError("成交额精度超出分")
+    return int(amount)
 
 
-def parse_tencent_daily(data):
+def parse_tencent_dates(data):
     rows = data.get("day")
     if not isinstance(rows, list) or not rows:
         raise ValueError("腾讯日线数据为空")
-    result = {}
+    result = set()
     for row in rows:
         if not isinstance(row, list) or len(row) < 6:
             raise ValueError("腾讯日线记录无效")
@@ -87,7 +96,31 @@ def parse_tencent_daily(data):
         datetime.strptime(date, "%Y-%m-%d")
         if date in result:
             raise ValueError(f"重复的交易日: {date}")
-        result[date] = tencent_volume(row[5])
+        result.add(date)
+    return sorted(result)
+
+
+def get_sohu_daily(code, start, end):
+    params = {"code": f"zs_{code}", "start": start, "end": end, "stat": 1, "order": "A", "period": "d", "_": int(time.time() * 1000)}
+    data = get_json(f"{SOHU_ROOT}?{urlencode(params)}", f"搜狐 {code} 日线", "https://q.stock.sohu.com/", encoding="gb18030")
+    if not isinstance(data, list) or not data or not isinstance(data[0], dict) or data[0].get("status") != 0:
+        raise ValueError(f"搜狐日线接口返回错误: {code}")
+    return data[0]
+
+
+def parse_sohu_daily(data):
+    rows = data.get("hq")
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("搜狐日线数据为空")
+    result = {}
+    for row in rows:
+        if not isinstance(row, list) or len(row) < 9:
+            raise ValueError("搜狐日线记录无效")
+        date = row[0]
+        datetime.strptime(date, "%Y-%m-%d")
+        if date in result:
+            raise ValueError(f"重复的交易日: {date}")
+        result[date] = amount_fen(row[8], 1000000)  # Sohu reports historical amounts in 万元.
     return result
 
 
@@ -101,13 +134,13 @@ def parse_tencent_minutes(data):
         if not isinstance(row, str):
             raise ValueError("腾讯分时记录无效")
         parts = row.split()
-        if len(parts) < 3 or not re.fullmatch(r"\d{4}", parts[0]):
+        if len(parts) < 4 or not re.fullmatch(r"\d{4}", parts[0]):
             raise ValueError("腾讯分时记录无效")
         clock = parts[0][:2] + ":" + parts[0][2:]
         stamp = f"{date} {clock}"
-        cumulative = tencent_volume(parts[2])
+        cumulative = amount_fen(parts[3])  # Tencent reports cumulative amount in yuan.
         if stamp <= last_stamp or cumulative < previous:
-            raise ValueError("腾讯分时记录时间或累计成交量异常")
+            raise ValueError("腾讯分时记录时间或累计成交额异常")
         if clock == "13:00":
             # Tencent repeats the last morning value at 13:00; it is not a new minute.
             if last_stamp != f"{date} 11:30" or cumulative != previous:
@@ -121,13 +154,13 @@ def parse_tencent_minutes(data):
     return result
 
 
-def volume(row):
+def eastmoney_amount(row):
     if not isinstance(row, str):
         raise ValueError("行情记录无效")
     parts = row.split(",")
-    if len(parts) < 6 or not re.fullmatch(r"\d+", parts[5]):
-        raise ValueError("行情成交量无效")
-    return int(parts[5])  # Eastmoney reports volume in hands (100 shares).
+    if len(parts) < 7:
+        raise ValueError("行情成交额无效")
+    return amount_fen(parts[6])  # Eastmoney f57 is amount in yuan.
 
 
 def parse_daily(data):
@@ -142,7 +175,7 @@ def parse_daily(data):
         datetime.strptime(date, "%Y-%m-%d")
         if date in result:
             raise ValueError(f"重复的交易日: {date}")
-        result[date] = volume(row)
+        result[date] = eastmoney_amount(row)
     return result
 
 
@@ -161,7 +194,7 @@ def parse_minutes(data):
             raise ValueError(f"不支持的分时时间: {stamp}")
         if stamp in result:
             raise ValueError(f"重复的分时时间: {stamp}")
-        result[stamp] = volume(row)
+        result[stamp] = eastmoney_amount(row)
     return result
 
 
@@ -221,7 +254,8 @@ def build_payload(daily, minutes, now, source="东方财富指数行情：上证
 
     return {
         "generated_at": now.astimezone(SHANGHAI).isoformat(timespec="seconds"),
-        "unit": "手",
+        "metric": "turnover",
+        "unit": "分",
         "source": source,
         "daily": daily_rows,
         "intraday": intraday,
@@ -237,19 +271,38 @@ def fetch_eastmoney(now):
     return daily, minutes
 
 
-def fetch_tencent(_now):
-    daily, minutes = {}, {}
+def fetch_sohu_tencent(now):
+    today = now.astimezone(SHANGHAI).date()
+    start = (today - timedelta(days=150)).strftime("%Y%m%d")
+    end = today.strftime("%Y%m%d")
+    daily, minutes, calendars = {}, {}, {}
     for key, (_, secid) in MARKETS.items():
         market, code = secid.split(".")
         symbol = ("sh" if market == "1" else "sz") + code
-        daily[key] = parse_tencent_daily(get_tencent_data("day", symbol))
+        daily[key] = parse_sohu_daily(get_sohu_daily(code, start, end))
+        calendars[key] = parse_tencent_dates(get_tencent_data("day", symbol))
         minutes[key] = parse_tencent_minutes(get_tencent_data("minute", symbol))
+    today_str = today.isoformat()
+    # Sohu may not publish today's daily record during trading. Tencent's
+    # minute data supplies it, but only when all three indices have today data.
+    if all(any(stamp.startswith(today_str + " ") for stamp in minutes[key]) for key in MARKETS):
+        for key in MARKETS:
+            if today_str not in calendars[key]:
+                calendars[key].append(today_str)
+            daily[key][today_str] = 0  # Replaced by the aligned minute sum in build_payload.
+    dates = sorted(set.intersection(*(set(calendars[key]) for key in MARKETS)))[-30:]
+    if len(dates) != 30 or any(sorted(calendars[key])[-30:] != dates for key in MARKETS):
+        raise ValueError("腾讯交易日历不一致或不完整")
+    for key in MARKETS:
+        if any(date not in daily[key] for date in dates):
+            raise ValueError(f"搜狐 {key} 历史成交额不完整")
+        daily[key] = {date: daily[key][date] for date in dates}
     return daily, minutes
 
 
 def fetch(now):
     errors = []
-    for name, provider in (("腾讯财经", fetch_tencent), ("东方财富", fetch_eastmoney)):
+    for name, provider in (("搜狐历史、腾讯财经分时", fetch_sohu_tencent), ("东方财富", fetch_eastmoney)):
         try:
             print(f"正在获取{name}行情…", flush=True)
             daily, minutes = provider(now)
