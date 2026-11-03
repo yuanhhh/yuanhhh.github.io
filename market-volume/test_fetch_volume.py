@@ -2,8 +2,9 @@ import unittest
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
-from fetch_volume import (MARKETS, SHANGHAI, amount_fen, build_payload, expected_minutes, fetch,
-                          fetch_sohu_tencent, get_data, get_tencent_data, parse_daily, parse_minutes,
+from fetch_volume import (HALF_HOUR_PERIODS, MARKETS, SHANGHAI, add_history, amount_fen, build_payload,
+                          expected_minutes, fetch, fetch_eastmoney_history, fetch_sohu_tencent,
+                          fetch_tencent_history, get_data, get_tencent_data, parse_daily, parse_minutes,
                           parse_sohu_daily, parse_tencent_dates, parse_tencent_minutes)
 
 
@@ -69,6 +70,44 @@ class VolumeTests(unittest.TestCase):
         self.assertEqual(periods[1]["values"]["sh"], 11)
         self.assertTrue(periods[1]["partial"])
         self.assertTrue(all(row["values"] is None and not row["partial"] for row in periods[2:]))
+
+    def test_eastmoney_historical_half_hours_use_real_amounts(self):
+        date = "2026-11-02"
+        records = [f"{date} {end},1,1,1,1,999,{index}.50" for index, (_, _, end) in enumerate(HALF_HOUR_PERIODS, 1)]
+        with patch("fetch_volume.get_data", return_value={"klines": records}):
+            history = fetch_eastmoney_history([date])
+        half = history[date]["half_hourly"]
+        self.assertEqual(len(half), 8)
+        self.assertEqual(half[0]["values"]["sh"], 150)
+        self.assertEqual(history[date]["hourly"][0]["values"]["sh"], 400)
+        self.assertEqual(history[date]["as_of"], f"{date} 15:00")
+        self.assertTrue(all(not row["partial"] for row in half))
+
+    def test_eastmoney_history_skips_missing_half_hour(self):
+        date = "2026-11-02"
+        records = [f"{date} {end},1,1,1,1,999,1.00" for _, _, end in HALF_HOUR_PERIODS[:-1]]
+        with patch("fetch_volume.get_data", return_value={"klines": records}):
+            self.assertEqual(fetch_eastmoney_history([date]), {})
+
+    def test_tencent_history_aggregates_complete_minute_data(self):
+        date = "2026-11-02"
+        stamps = sorted(expected_minutes(date, f"{date} 15:00"))
+        rows = [f"{stamp[11:13]}{stamp[14:16]} 1 999 {index}.00" for index, stamp in enumerate(stamps, 1)]
+        data = {"data": [{"date": "20261102", "data": rows}]}
+        with patch("fetch_volume.get_tencent_data", return_value=data):
+            history = fetch_tencent_history([date])
+        self.assertEqual(len(history[date]["half_hourly"]), 8)
+        self.assertEqual(history[date]["half_hourly"][0]["values"]["sh"], 3100)
+        self.assertEqual(sum(row["values"]["sh"] for row in history[date]["hourly"]), len(stamps) * 100)
+        self.assertEqual(history[date]["source"], "腾讯财经历史分时")
+
+    def test_history_failure_does_not_break_today(self):
+        payload = {"generated_at": "2026-11-03T10:00:00+08:00", "daily": [{"date": "2026-11-02"}, {"date": "2026-11-03"}]}
+        with patch("fetch_volume.fetch_eastmoney_history", side_effect=RuntimeError("blocked")) as eastmoney, \
+             patch("fetch_volume.fetch_tencent_history", side_effect=RuntimeError("blocked")) as tencent:
+            self.assertEqual(add_history(payload)["intraday_history"], {})
+            eastmoney.assert_called_once_with(["2026-11-02"])
+            tencent.assert_called_once_with(["2026-11-02"])
 
     def test_non_trading_day_does_not_show_yesterday_as_today(self):
         minutes = {key: {"2026-11-02 15:00": 20} for key in MARKETS}

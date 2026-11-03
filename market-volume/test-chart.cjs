@@ -10,8 +10,8 @@ const document = {
   querySelectorAll: () => [],
 };
 const context = vm.createContext({ document, setTimeout, TextDecoder, Uint8Array });
-vm.runInContext(`${script}\nthis.chartFunctions = { format, seriesValue, renderTable, renderChart, validate, trendPath, lineState };`, context);
-const { format, seriesValue, renderTable, renderChart, validate, trendPath, lineState } = context.chartFunctions;
+vm.runInContext(`${script}\nthis.chartFunctions = { format, seriesValue, renderTable, renderChart, validate, trendPath, lineState, parseBrowserHistory, yuanToFen };`, context);
+const { format, seriesValue, renderTable, renderChart, validate, trendPath, lineState, parseBrowserHistory, yuanToFen } = context.chartFunctions;
 
 const values = { sh: 20000000000, sz: 30000000000, star: 10000000000 };
 
@@ -104,6 +104,40 @@ test("分时数据必须同时包含四个小时和八个半小时时段", () =>
   const payload = { request_id: "test", daily: rows, unit: "分", metric: "turnover", intraday: { hourly: Array(4).fill(period), half_hourly: Array(8).fill(period) } };
   assert.doesNotThrow(() => validate(payload, "test"));
   assert.throws(() => validate({ ...payload, intraday: { hourly: Array(4).fill(period) } }, "test"));
+});
+
+test("历史分时必须属于所列交易日且包含完整时段", () => {
+  const rows = Array.from({ length: 30 }, () => ({ date: "2026-11-03", values }));
+  const period = { period: "09:30–10:00", values };
+  const history = { date: "2026-11-03", hourly: Array(4).fill(period), half_hourly: Array(8).fill(period) };
+  const payload = { request_id: "test", daily: rows, unit: "分", metric: "turnover", intraday: null, intraday_history: { "2026-11-03": history } };
+  assert.doesNotThrow(() => validate(payload, "test"));
+  assert.throws(() => validate({ ...payload, intraday_history: { "2026-11-03": { ...history, half_hourly: Array(7).fill(period) } } }, "test"));
+  assert.throws(() => validate({ ...payload, intraday_history: { "2026-10-30": { ...history, date: "2026-10-30" } } }, "test"));
+});
+
+test("浏览器历史分时取真实成交额，汇总为 8 个半小时和 4 个小时", () => {
+  const date = "2026-11-02";
+  const ends = ["10:00", "10:30", "11:00", "11:30", "13:30", "14:00", "14:30", "15:00"];
+  const rows = ends.map((time, index) => `${date} ${time},1,1,1,1,999,${index + 1}.50`);
+  const results = Object.fromEntries(["sh", "sz", "star"].map(key => [key, { rc: 0, data: { klines: rows } }]));
+  const history = parseBrowserHistory(results, [date, "2026-10-30"]);
+  assert.equal(history[date].half_hourly.length, 8);
+  assert.equal(history[date].half_hourly[0].values.sh, 150);
+  assert.equal(history[date].hourly[0].values.sh, 400);
+  assert.equal(history[date].as_of, `${date} 15:00`);
+  assert.equal(history["2026-10-30"], undefined);
+  assert.equal(yuanToFen("810009457713.90"), 81000945771390);
+  assert.throws(() => yuanToFen("1.234"));
+  assert.throws(() => yuanToFen("NaN"));
+});
+
+test("浏览器历史分时缺失一只指数时不能用零替代", () => {
+  const date = "2026-11-02";
+  const ends = ["10:00", "10:30", "11:00", "11:30", "13:30", "14:00", "14:30", "15:00"];
+  const rows = ends.map(time => `${date} ${time},1,1,1,1,999,1.00`);
+  const results = { sh: { rc: 0, data: { klines: rows } }, sz: { rc: 0, data: { klines: rows } }, star: { rc: 0, data: { klines: rows.slice(0, -1) } } };
+  assert.equal(Object.keys(parseBrowserHistory(results, [date])).length, 0);
 });
 
 test("zero is not rendered as a positive-height bar", () => {

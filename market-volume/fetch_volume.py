@@ -66,6 +66,8 @@ def get_data(kind, secid, **extra):
 def get_tencent_data(kind, symbol):
     if kind == "day":
         path, params = "kline/kline", {"param": f"{symbol},day,,,60"}
+    elif kind == "history":
+        path, params = "day/query", {"code": symbol}
     else:
         path, params = "minute/query", {"code": symbol}
     # Avoid a cached minute snapshot when refreshing during trading hours.
@@ -233,6 +235,96 @@ def aggregate_periods(aligned, latest, periods):
     return result
 
 
+def historical_snapshot(date, half_hourly, source):
+    """Derive hourly values from eight complete half-hour amounts."""
+    if len(half_hourly) != 8 or any(row["values"] is None for row in half_hourly):
+        raise ValueError(f"{date} 历史分时数据不完整")
+    hourly = []
+    for index, (label, _, _) in enumerate(PERIODS):
+        first, second = half_hourly[index * 2:index * 2 + 2]
+        hourly.append({"period": label, "values": {key: first["values"][key] + second["values"][key] for key in MARKETS}, "partial": False})
+    return {"date": date, "as_of": f"{date} 15:00", "source": source, "hourly": hourly, "half_hourly": half_hourly}
+
+
+def parse_eastmoney_half_hours(data):
+    rows = data.get("klines")
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("东方财富历史分时为空")
+    result = {}
+    for row in rows:
+        if not isinstance(row, str):
+            raise ValueError("东方财富历史分时记录无效")
+        stamp = row.split(",", 1)[0]
+        datetime.strptime(stamp, "%Y-%m-%d %H:%M")
+        if stamp in result:
+            raise ValueError(f"重复的历史分时时间: {stamp}")
+        result[stamp] = eastmoney_amount(row)
+    return result
+
+
+def fetch_eastmoney_history(allowed_dates):
+    start = min(allowed_dates).replace("-", "")
+    data = {key: parse_eastmoney_half_hours(get_data("kline", secid, klt=30, fqt=0, beg=start, end="20500101")) for key, (_, secid) in MARKETS.items()}
+    history = {}
+    for date in allowed_dates:
+        stamps = [f"{date} {end}" for _, _, end in HALF_HOUR_PERIODS]
+        if not all(stamp in data[key] for key in MARKETS for stamp in stamps):
+            continue
+        rows = [{"period": period[0], "values": {key: data[key][stamp] for key in MARKETS}, "partial": False} for period, stamp in zip(HALF_HOUR_PERIODS, stamps)]
+        history[date] = historical_snapshot(date, rows, "东方财富历史 30 分钟行情")
+    return history
+
+
+def fetch_tencent_history(allowed_dates):
+    market_days = {}
+    for key, (_, secid) in MARKETS.items():
+        market, code = secid.split(".")
+        symbol = ("sh" if market == "1" else "sz") + code
+        rows = get_tencent_data("history", symbol).get("data")
+        if not isinstance(rows, list):
+            raise ValueError(f"腾讯历史分时为空: {symbol}")
+        by_date = {}
+        for day in rows:
+            if not isinstance(day, dict):
+                raise ValueError("腾讯历史分时记录无效")
+            minutes = parse_tencent_minutes({"data": day})
+            if not minutes:
+                continue
+            date = next(iter(minutes))[:10]
+            if date in by_date:
+                raise ValueError(f"重复的历史交易日: {date}")
+            by_date[date] = minutes
+        market_days[key] = by_date
+    history = {}
+    for date in allowed_dates:
+        if not all(date in market_days[key] for key in MARKETS):
+            continue
+        aligned = {key: market_days[key][date] for key in MARKETS}
+        expected = expected_minutes(date, f"{date} 15:00")
+        if not all(set(aligned[key]) == expected for key in MARKETS):
+            continue
+        rows = aggregate_periods(aligned, f"{date} 15:00", HALF_HOUR_PERIODS)
+        history[date] = historical_snapshot(date, rows, "腾讯财经历史分时")
+    return history
+
+
+def add_history(payload):
+    # Current-day data comes from the live snapshot, not historical bars.
+    today = payload["generated_at"][:10]
+    dates = [row["date"] for row in payload["daily"] if row["date"] < today]
+    history = {}
+    if dates:
+        for name, provider in (("东方财富", fetch_eastmoney_history), ("腾讯财经", fetch_tencent_history)):
+            try:
+                # Prefer Tencent's minute-based data for recent days.
+                history.update(provider(dates))
+            except (RuntimeError, ValueError, KeyError, TypeError) as error:
+                print(f"{name}历史分时暂不可用: {error}", file=sys.stderr, flush=True)
+    payload["intraday_history"] = history
+    print(f"已获取 {len(history)} 个历史交易日的分时数据", flush=True)
+    return payload
+
+
 def build_payload(daily, minutes, now, source="东方财富指数行情：上证A股指数、深证A指、科创综指"):
     today = now.astimezone(SHANGHAI).date().isoformat()
     date_sets = [set(daily[key]) for key in MARKETS]
@@ -338,7 +430,7 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r"volume-[0-9]{17}-[0-9a-f]{8}", args.request_id):
         parser.error("invalid request id")
-    payload = fetch(datetime.now(SHANGHAI))
+    payload = add_history(fetch(datetime.now(SHANGHAI)))
     payload["request_id"] = args.request_id
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temp = args.output.with_suffix(".tmp")
