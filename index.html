@@ -58,7 +58,7 @@
     .section-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 18px; }
     .section-heading h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.04em; }
     .section-kicker { color: #929b91; }
-    .tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
     .tool {
       position: relative;
       display: flex;
@@ -73,6 +73,7 @@
     .tool:hover { transform: translateY(-4px); box-shadow: 0 18px 30px #26392b20; }
     .tool-dark { color: #f4f4e8; background: #254a39; }
     .tool-light { color: #3b3b2e; background: #e9e4d4; }
+    .tool-volume { color: #263d39; background: #dce8df; }
     .card-top, .card-bottom { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; }
     .card-number { opacity: .58; }
     .card-type { opacity: .7; }
@@ -82,6 +83,10 @@
     .tool:hover .arrow { transform: rotate(45deg); }
     .card-art { position: absolute; top: 44px; right: 6%; width: 43%; height: 135px; opacity: .8; }
     footer { display: flex; justify-content: space-between; padding: 25px 0 36px; border-top: 1px solid var(--line); color: #a0a69e; font-size: 11px; letter-spacing: .04em; }
+    @media (min-width: 701px) and (max-width: 900px) {
+      .tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .tool-volume { grid-column: 1 / -1; }
+    }
     @media (max-width: 700px) {
       .wrap { width: calc(100% - 40px); }
       .header { min-height: 76px; }
@@ -106,10 +111,10 @@
 
     <main>
       <section id="tools" aria-labelledby="tools-title">
-        <div class="section-heading"><h1 id="tools-title">探索工具</h1><span class="section-kicker">Selected tools / 02</span></div>
+        <div class="section-heading"><h1 id="tools-title">探索工具</h1><span class="section-kicker">Selected tools / 03</span></div>
         <div class="tools">
           <a class="tool tool-dark" href="/stock-similarity/">
-            <div class="card-top"><span class="card-number">01 / 02</span><span class="card-type">Pattern</span></div>
+            <div class="card-top"><span class="card-number">01 / 03</span><span class="card-type">Pattern</span></div>
             <svg class="card-art" viewBox="0 0 220 130" fill="none" aria-hidden="true">
               <path d="M0 32H220M0 65H220M0 98H220" stroke="#fff" stroke-opacity=".12"/>
               <path d="M0 96l25-13 22 5 27-36 24 15 26-32 24 20 24-19 25 8 23-25" stroke="#c7dfbe" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -119,7 +124,7 @@
             <div class="card-bottom"><div><h2>股票走势相似度</h2><p>发现相似的走势</p></div><span class="arrow" aria-hidden="true">↗</span></div>
           </a>
           <a class="tool tool-light" href="/three-down/">
-            <div class="card-top"><span class="card-number">02 / 02</span><span class="card-type">Screener</span></div>
+            <div class="card-top"><span class="card-number">02 / 03</span><span class="card-type">Screener</span></div>
             <svg class="card-art" viewBox="0 0 220 130" fill="none" aria-hidden="true">
               <path d="M0 32H220M0 65H220M0 98H220" stroke="#536b55" stroke-opacity=".14"/>
               <path d="M29 22v49M61 35v46M93 48v49M125 54v50M157 66v45M189 57v40" stroke="#8a9d84" stroke-width="2"/>
@@ -131,6 +136,14 @@
               <rect x="182" y="67" width="14" height="19" rx="2" fill="#c78258"/>
             </svg>
             <div class="card-bottom"><div><h2>三连阴缩量选股</h2><p>寻找值得关注的形态</p></div><span class="arrow" aria-hidden="true">↗</span></div>
+          </a>
+          <a class="tool tool-volume" href="/market-volume/">
+            <div class="card-top"><span class="card-number">03 / 03</span><span class="card-type">Market</span></div>
+            <svg class="card-art" viewBox="0 0 220 130" fill="none" aria-hidden="true">
+              <path d="M0 32H220M0 65H220M0 98H220" stroke="#536b55" stroke-opacity=".14"/>
+              <path d="M22 96V72M53 96V55M84 96V67M115 96V36M146 96V52M177 96V24M208 96V44" stroke="#5d8970" stroke-width="13" stroke-linecap="round"/>
+            </svg>
+            <div class="card-bottom"><div><h2>A 股成交量</h2><p>查看每日与分时成交</p></div><span class="arrow" aria-hidden="true">↗</span></div>
           </a>
         </div>
       </section>

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A 股最近 30 个交易日及今日分时成交量">
+  <meta name="theme-color" content="#f6f5ef">
+  <title>A 股成交量 · Yuanhui</title>
+  <style>
+    :root { color-scheme: light; --ink: #1d2924; --muted: #748078; --line: #e2e5dc; --green: #2e5b46; --paper: #f6f5ef; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--paper); font: 15px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    a { color: inherit; }
+    a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid #d47949; outline-offset: 3px; }
+    .wrap { width: min(1120px, calc(100% - 48px)); margin: auto; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 84px; border-bottom: 1px solid var(--line); }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 750; text-decoration: none; }
+    .mark { display: grid; width: 35px; height: 35px; place-items: center; border-radius: 50%; color: #fff; background: var(--ink); font: italic 19px Georgia, serif; }
+    .back { color: #657369; font-size: 13px; text-decoration: none; }
+    main { padding: 48px 0 70px; }
+    .intro { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 25px; }
+    .eyebrow { margin: 0 0 6px; color: var(--green); font-size: 11px; font-weight: 700; letter-spacing: .14em; }
+    h1 { margin: 0; font-size: clamp(29px, 4vw, 40px); letter-spacing: -.05em; line-height: 1.2; }
+    .intro p:last-child { margin: 9px 0 0; color: var(--muted); font-size: 13px; }
+    .panel { margin-bottom: 16px; padding: 25px; border: 1px solid var(--line); border-radius: 16px; background: #fffefa; }
+    .form { display: flex; align-items: end; gap: 12px; }
+    .field { flex: 1; }
+    label { display: block; margin-bottom: 7px; color: #42584a; font-size: 12px; font-weight: 700; }
+    input, button { min-height: 44px; border-radius: 9px; font: inherit; }
+    input { width: 100%; padding: 0 13px; border: 1px solid #d5ddd3; color: var(--ink); background: #fbfcf8; }
+    button { padding: 0 22px; border: 0; color: #fff; background: var(--green); font-weight: 700; cursor: pointer; }
+    button:hover { background: #214937; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .help, .status, .note { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+    .status { min-height: 1.6em; color: var(--green); }
+    .status.error { color: #a24437; }
+    .status a { margin-left: 8px; }
+    .section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+    h2 { margin: 0; font-size: 18px; letter-spacing: -.03em; }
+    .subtle { color: var(--muted); font-size: 12px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 18px; margin: 19px 0 12px; color: #5f6b62; font-size: 12px; }
+    .legend span { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 9px; height: 9px; border-radius: 3px; }
+    .sh { background: #376b50; } .sz { background: #a5bba4; } .star { background: #db986f; }
+    .chart-scroll { overflow-x: auto; padding: 0 0 8px; }
+    .chart { display: flex; align-items: end; gap: 9px; min-width: max-content; min-height: 220px; padding: 18px 0 0; background: repeating-linear-gradient(to top, transparent 0, transparent 53px, #eef0e9 54px, transparent 55px); }
+    .group { display: flex; width: 37px; flex: none; flex-direction: column; align-items: center; justify-content: end; }
+    .bars { display: flex; width: 100%; height: 165px; align-items: end; justify-content: center; gap: 2px; }
+    .bar { width: 9px; min-height: 2px; border-radius: 3px 3px 0 0; }
+    .axis-label { display: block; height: 42px; padding-top: 7px; color: #869087; font-size: 10px; text-align: center; white-space: nowrap; }
+    .hour-chart { min-width: 430px; justify-content: space-around; }
+    .hour-chart .group { width: 78px; }
+    .hour-chart .bars { gap: 5px; }
+    .hour-chart .bar { width: 15px; }
+    .hour-chart .axis-label { height: 42px; text-align: center; }
+    .partial { color: #c17a51; }
+    .empty { display: grid; min-height: 160px; place-items: center; color: #98a39a; font-size: 13px; text-align: center; }
+    details { margin-top: 20px; border-top: 1px solid var(--line); }
+    summary { padding-top: 15px; color: #52695a; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; margin-top: 12px; border-collapse: collapse; font-size: 12px; text-align: right; white-space: nowrap; }
+    th, td { padding: 9px 10px; border-bottom: 1px solid #edf0e9; }
+    th { color: #7d8b7f; font-weight: 600; }
+    th:first-child, td:first-child { text-align: left; }
+    footer { padding: 22px 0 32px; border-top: 1px solid var(--line); color: #a0a69e; font-size: 11px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 600px) {
+      .wrap { width: calc(100% - 32px); }
+      header { min-height: 72px; }
+      main { padding: 34px 0 48px; }
+      .panel { padding: 20px 16px; }
+      .form { align-items: stretch; flex-direction: column; }
+      button { width: 100%; }
+      .legend { gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header><a class="brand" href="/"><span class="mark" aria-hidden="true">y</span>yuanhui.</a><a class="back" href="/">← 返回主页</a></header>
+    <main>
+      <div class="intro"><div><p class="eyebrow">MARKET VOLUME</p><h1>A 股成交量</h1><p>最近 30 个交易日与今日分时</p></div></div>
+      <section class="panel" aria-label="更新行情">
+        <form id="form" class="form">
+          <div class="field"><label for="token">GitHub Fine-grained Token</label><input id="token" type="password" autocomplete="off" placeholder="github_pat_..." required></div>
+          <button id="refresh" type="submit">更新行情 ↗</button>
+        </form>
+        <p class="help">点击后通过 GitHub Actions 拉取；Token 仅保留在当前页面内存中。</p>
+        <p id="status" class="status" role="status" aria-live="polite">填写 Token 后点击更新。</p>
+      </section>
+      <section class="panel" aria-labelledby="daily-title">
+        <div class="section-head"><h2 id="daily-title">近 30 个交易日</h2><span id="updated" class="subtle">单位：亿股</span></div>
+        <div class="legend" aria-label="图例"><span><i class="dot sh"></i>沪市 A 股</span><span><i class="dot sz"></i>深市 A 股</span><span><i class="dot star"></i>科创板</span></div>
+        <div id="daily-empty" class="empty">更新后查看成交量</div>
+        <div id="daily-content" hidden>
+          <div class="chart-scroll"><div id="daily-chart" class="chart" role="img" aria-label="最近 30 个交易日成交量柱状图，详细数值见下方表格"></div></div>
+          <p class="note">当日数据为截至最新分时的快照。科创板包含在沪市中，不重复计入沪深合计。图表可横向滑动。</p>
+          <details><summary>查看每日数据</summary><div class="table-scroll"><table><thead><tr><th>交易日</th><th>沪市 A 股</th><th>深市 A 股</th><th>科创板</th><th>沪深合计</th></tr></thead><tbody id="daily-table"></tbody></table></div></details>
+        </div>
+      </section>
+      <section class="panel" aria-labelledby="hourly-title">
+        <div class="section-head"><h2 id="hourly-title">今日分时</h2><span id="as-of" class="subtle">单位：亿股</span></div>
+        <div class="legend" aria-label="图例"><span><i class="dot sh"></i>沪市 A 股</span><span><i class="dot sz"></i>深市 A 股</span><span><i class="dot star"></i>科创板</span></div>
+        <div id="hourly-empty" class="empty">更新后查看今日分时</div>
+        <div id="hourly-content" hidden>
+          <div class="chart-scroll"><div id="hourly-chart" class="chart hour-chart" role="img" aria-label="今日分时成交量柱状图，详细数值见下方表格"></div></div>
+          <p class="note">北京时间；开盘集合竞价计入第一段。未满一小时显示截至最新分时的实际成交量。</p>
+          <details><summary>查看分时数据</summary><div class="table-scroll"><table><thead><tr><th>时段</th><th>沪市 A 股</th><th>深市 A 股</th><th>科创板</th><th>沪深合计</th></tr></thead><tbody id="hourly-table"></tbody></table></div></details>
+        </div>
+      </section>
+      <p class="note">来源：东方财富指数行情（上证 A 股指数、深证 A 指、科创综指）；科创综指按数据源口径展示，并非保证覆盖全部科创板股票。行情可能延迟，仅供参考。</p>
+    </main>
+    <footer>© Yuanhui</footer>
+  </div>
+  <script>
+    const OWNER = "yuanhhh", REPO = "yuanhhh.github.io", BRANCH = "master", WORKFLOW = "market-volume.yml";
+    const apiRoot = `https://api.github.com/repos/${OWNER}/${REPO}`;
+    const markets = [["sh", "沪市 A 股"], ["sz", "深市 A 股"], ["star", "科创板"]];
+    const $ = id => document.getElementById(id);
+    const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[char]));
+    const format = value => (value / 1000000).toFixed(2); // 1 手 = 100 股; 100 万手 = 1 亿股.
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    async function api(path, token, options = {}) {
+      const response = await fetch(apiRoot + path, { ...options, cache: "no-store", headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28", ...options.headers } });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const error = new Error(data.message || `GitHub API 返回 ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+      return response.status === 204 ? null : response.json();
+    }
+
+    function setStatus(message, isError = false, runId = null) {
+      const status = $("status");
+      status.className = `status${isError ? " error" : ""}`;
+      status.textContent = message;
+      if (runId) {
+        const link = document.createElement("a");
+        link.href = `https://github.com/${OWNER}/${REPO}/actions/runs/${encodeURIComponent(runId)}`;
+        link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "查看运行日志 ↗";
+        status.appendChild(link);
+      }
+    }
+
+    function validate(payload, requestId) {
+      const validValues = values => values && markets.every(([key]) => Number.isSafeInteger(values[key]) && values[key] >= 0);
+      if (!payload || payload.request_id !== requestId || !Array.isArray(payload.daily) || payload.daily.length !== 30 ||
+          payload.daily.some(row => !/^\d{4}-\d{2}-\d{2}$/.test(row.date) || !validValues(row.values)) ||
+          (payload.intraday && (!Array.isArray(payload.intraday.hourly) || payload.intraday.hourly.length !== 4 || payload.intraday.hourly.some(row => row.values !== null && !validValues(row.values))))) {
+        throw new Error("返回数据不完整，请重试。");
+      }
+    }
+
+    function renderChart(element, rows, label) {
+      const maximum = Math.max(1, ...rows.flatMap(row => row.values ? markets.map(([key]) => row.values[key]) : []));
+      element.innerHTML = rows.map(row => {
+        const name = label(row);
+        const bars = row.values ? markets.map(([key, title]) => {
+          const value = row.values[key];
+          return `<span class="bar ${key}" style="height:${Math.max(0, value / maximum * 100)}%" title="${escapeHtml(name)} · ${title}：${format(value)} 亿股"></span>`;
+        }).join("") : "";
+        const suffix = row.partial ? '<br><span class="partial">进行中</span>' : "";
+        return `<div class="group"><div class="bars">${bars}</div><span class="axis-label">${escapeHtml(name)}${suffix}</span></div>`;
+      }).join("");
+    }
+
+    function renderTable(element, rows, label) {
+      element.innerHTML = rows.map(row => {
+        const values = row.values;
+        const cells = values ? [...markets.map(([key]) => format(values[key])), format(values.sh + values.sz)] : ["—", "—", "—", "—"];
+        return `<tr><td>${escapeHtml(label(row))}${row.partial ? "（进行中）" : ""}</td>${cells.map(value => `<td>${value}</td>`).join("")}</tr>`;
+      }).join("");
+    }
+
+    function render(payload) {
+      renderChart($("daily-chart"), payload.daily, row => row.date.slice(5));
+      renderTable($("daily-table"), [...payload.daily].reverse(), row => row.date);
+      $("daily-empty").hidden = true; $("daily-content").hidden = false;
+      $("daily-chart").parentElement.scrollLeft = $("daily-chart").parentElement.scrollWidth;
+      $("updated").textContent = `单位：亿股 · 更新：${payload.generated_at.replace("T", " ").slice(0, 19)}（北京）`;
+      if (payload.intraday) {
+        renderChart($("hourly-chart"), payload.intraday.hourly, row => row.period);
+        renderTable($("hourly-table"), payload.intraday.hourly, row => row.period);
+        $("as-of").textContent = `单位：亿股 · 截至 ${payload.intraday.as_of}（北京）`;
+        $("hourly-empty").hidden = true; $("hourly-content").hidden = false;
+      } else {
+        $("as-of").textContent = "单位：亿股";
+        $("hourly-empty").textContent = "今日暂无分时数据（未开盘或非交易日）。";
+        $("hourly-empty").hidden = false; $("hourly-content").hidden = true;
+      }
+    }
+
+    async function waitForResult(token, requestId) {
+      let runId = null;
+      for (let attempt = 0; attempt < 120; attempt++) {
+        try {
+          const result = await api(`/contents/market-volume/results/${encodeURIComponent(requestId)}.json?ref=${BRANCH}&t=${Date.now()}`, token);
+          const bytes = Uint8Array.from(atob(result.content.replace(/\s/g, "")), char => char.charCodeAt(0));
+          const payload = JSON.parse(new TextDecoder().decode(bytes));
+          validate(payload, requestId);
+          return { payload, runId };
+        } catch (error) {
+          if (error.status !== 404) throw error;
+        }
+        const result = await api(`/actions/workflows/${WORKFLOW}/runs?event=workflow_dispatch&per_page=100`, token);
+        const run = result.workflow_runs.find(item => item.display_title === `行情查询 / ${requestId}`);
+        if (run) {
+          runId = run.id;
+          if (run.status === "completed" && run.conclusion !== "success") {
+            const error = new Error(`工作流执行${run.conclusion === "cancelled" ? "已取消" : "失败"}，请查看日志。`);
+            error.runId = runId;
+            throw error;
+          }
+          setStatus(run.status === "completed" ? "任务完成，正在读取结果…" : "正在拉取行情…", false, runId);
+        } else setStatus("已提交，等待 GitHub Actions 接收…");
+        await sleep(3000);
+      }
+      const error = new Error("等待超时，请查看运行日志或稍后重试。"); error.runId = runId; throw error;
+    }
+
+    $("form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const token = $("token").value.trim();
+      if (!token) { setStatus("请填写 GitHub Token。", true); return; }
+      const requestId = `volume-${new Date().toISOString().replace(/[-:.TZ]/g, "")}-${crypto.randomUUID().slice(0, 8)}`;
+      $("refresh").disabled = true;
+      try {
+        setStatus("正在提交任务…");
+        await api(`/actions/workflows/${WORKFLOW}/dispatches`, token, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ref: BRANCH, inputs: { request_id: requestId } }) });
+        const result = await waitForResult(token, requestId);
+        render(result.payload);
+        setStatus("行情已更新。", false, result.runId);
+      } catch (error) {
+        const previous = $("daily-content").hidden ? "" : " 图表仍为上次结果。";
+        setStatus((error.message || "更新失败，请稍后重试。") + previous, true, error.runId);
+      } finally { $("refresh").disabled = false; }
+    });
+  </script>
+</body>
+</html>
